@@ -34,13 +34,20 @@ def _image_resource(psd: Any, resource: Resource) -> Any | None:
         return None
 
 
-def _has_document_transparency(psd: Any, image: Any) -> bool:
+def _psd_has_transparency(psd: Any) -> bool | None:
     try:
         return bool(has_transparency(psd))
     except (AttributeError, KeyError, TypeError):
-        # Lightweight test doubles and older compatible readers may not expose
-        # the low-level channel metadata used by psd-tools.
-        return image_has_alpha(image)
+        return None
+
+
+def _has_document_transparency(psd: Any, image: Any) -> bool:
+    detected = _psd_has_transparency(psd)
+    if detected is not None:
+        return detected
+    # Lightweight test doubles and older compatible readers may not expose
+    # the low-level channel metadata used by psd-tools.
+    return image_has_alpha(image)
 
 
 def _unavailable_result(
@@ -60,7 +67,7 @@ def _unavailable_result(
         depth=int(psd.depth),
         pil_mode=None,
         icc_profile=icc_profile,
-        has_alpha=False,
+        has_alpha=bool(_psd_has_transparency(psd)),
         is_reliable=False,
         warning=warning,
         error=error,

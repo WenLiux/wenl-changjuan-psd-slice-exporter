@@ -10,6 +10,7 @@ from .export_result import (
     ExportResult,
     ExportStatus,
     OutputFormat,
+    PhotoshopFallbackMode,
 )
 from .scale_plan import MappedSlice, ResizeStrategy, ScalePlan
 from .slice_info import SliceInfo, SliceIssue, SliceParseResult
@@ -26,6 +27,7 @@ __all__ = [
     "ExportResult",
     "ExportStatus",
     "OutputFormat",
+    "PhotoshopFallbackMode",
     "MappedSlice",
     "ResizeStrategy",
     "ScalePlan",

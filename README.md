@@ -14,9 +14,9 @@ Completed:
 - Stage 4: globally aligned target-width scaling.
 - Stage 5: structured preflight and post-export validation reports.
 - Stage 6: PNG/JPEG encoding and explicit color handling.
+- Stage 7: optional Photoshop high-fidelity fallback with source protection.
 
-Stage 7, the optional Photoshop high-fidelity fallback, is the next planned
-stage. The desktop UI has not started.
+Stage 8, the responsive Windows desktop UI, is the next planned stage.
 
 Reports:
 
@@ -27,6 +27,7 @@ Reports:
 - `docs/stage-4-report.md`
 - `docs/stage-5-report.md`
 - `docs/stage-6-report.md`
+- `docs/stage-7-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -97,8 +98,28 @@ defaults to sRGB. CMYK, 16-bit, and unsupported modes stop before export unless
 compatible embedded ICC profile; Photoshop high-fidelity mode is the
 recommended fallback when those safety conditions are not met.
 
+## Photoshop high-fidelity fallback
+
+The embedded merged image remains the default. Photoshop is never contacted
+unless explicitly selected:
+
+```powershell
+python -m pip install -r requirements-photoshop.txt
+python scripts/export_slices.py input.psb --photoshop if_needed
+python scripts/export_slices.py input.psd --photoshop always
+```
+
+By default Photoshop must already be running with no open documents. Starting
+it requires the separate `--allow-photoshop-launch` flag.
+
+Fallback opens only a verified system-temporary copy, uses standard PNG Save
+As rather than Save for Web, closes only its own temporary document without
+saving, never quits Photoshop, and verifies the original SHA-256, size, and
+modification time before and after. V1 Photoshop fallback is restricted to
+8-bit RGB documents.
+
 ## Current test result
 
 ```text
-51 passed
+65 passed
 ```

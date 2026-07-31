@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import app.services.export_service as export_service_module
 from app.models.composite_result import CompositeResult
 from app.models.export_result import ExportOptions, ExportProgress
 from app.models.slice_info import SliceInfo, SliceParseResult
@@ -342,3 +343,178 @@ def test_real_psd_exports_full_width_slices_at_750px(tmp_path: Path) -> None:
     assert sum(item.height for item in result.exported_slices) == round(
         28164 * 750 / 1440
     )
+
+
+def test_if_needed_photoshop_fallback_replaces_missing_composite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "fallback.psd"
+    slices, embedded = prepared_document(source)
+    embedded.image.close()
+    missing = CompositeResult(
+        image=None,
+        source="missing",
+        width=10,
+        height=20,
+        color_mode="RGB",
+        depth=8,
+        pil_mode=None,
+        icc_profile=None,
+        has_alpha=True,
+        is_reliable=False,
+        error="No embedded composite.",
+    )
+    photoshop = CompositeResult(
+        image=Image.new("RGBA", (10, 20), (5, 6, 7, 128)),
+        source="photoshop",
+        width=10,
+        height=20,
+        color_mode="RGB",
+        depth=8,
+        pil_mode="RGBA",
+        icc_profile=None,
+        has_alpha=True,
+        is_reliable=True,
+    )
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        export_service_module.PSDImage,
+        "open",
+        lambda path: object(),
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "parse_document_slices",
+        lambda psd: slices,
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "read_embedded_composite",
+        lambda psd: missing,
+    )
+
+    def fake_photoshop(
+        path: Path,
+        **kwargs: object,
+    ) -> CompositeResult:
+        calls.append({"path": path, **kwargs})
+        return photoshop
+
+    monkeypatch.setattr(
+        export_service_module,
+        "read_photoshop_composite",
+        fake_photoshop,
+    )
+
+    result = export_slices(
+        source,
+        ExportOptions(
+            output_parent=tmp_path,
+            photoshop_fallback="if_needed",
+        ),
+    )
+
+    assert result.success
+    assert result.composite_source == "photoshop"
+    assert result.composite_warning is not None
+    assert "No embedded composite" in result.composite_warning
+    assert len(calls) == 1
+    assert calls[0]["path"] == source
+    assert calls[0]["expected_has_alpha"] is True
+    assert len(result.exported_slices) == 2
+
+
+def test_disabled_photoshop_fallback_preserves_existing_failure_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "disabled.psd"
+    slices, embedded = prepared_document(source)
+    embedded.image.close()
+    missing = CompositeResult(
+        image=None,
+        source="missing",
+        width=10,
+        height=20,
+        color_mode="RGB",
+        depth=8,
+        pil_mode=None,
+        icc_profile=None,
+        has_alpha=False,
+        is_reliable=False,
+        error="No embedded composite.",
+    )
+    monkeypatch.setattr(
+        export_service_module.PSDImage,
+        "open",
+        lambda path: object(),
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "parse_document_slices",
+        lambda psd: slices,
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "read_embedded_composite",
+        lambda psd: missing,
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "read_photoshop_composite",
+        lambda *args, **kwargs: pytest.fail(
+            "Photoshop must remain disabled by default."
+        ),
+    )
+
+    with pytest.raises(
+        ExportPreflightError,
+        match="No embedded composite",
+    ):
+        export_slices(
+            source,
+            ExportOptions(output_parent=tmp_path),
+        )
+
+
+def test_if_needed_fallback_skips_reliable_embedded_composite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "reliable.psd"
+    slices, composite = prepared_document(source)
+    monkeypatch.setattr(
+        export_service_module.PSDImage,
+        "open",
+        lambda path: object(),
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "parse_document_slices",
+        lambda psd: slices,
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "read_embedded_composite",
+        lambda psd: composite,
+    )
+    monkeypatch.setattr(
+        export_service_module,
+        "read_photoshop_composite",
+        lambda *args, **kwargs: pytest.fail(
+            "Reliable composites must not start Photoshop."
+        ),
+    )
+
+    result = export_slices(
+        source,
+        ExportOptions(
+            output_parent=tmp_path,
+            photoshop_fallback="if_needed",
+        ),
+    )
+
+    assert result.success
+    assert result.composite_source == "embedded_merged"

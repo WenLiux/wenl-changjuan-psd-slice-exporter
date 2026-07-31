@@ -16,6 +16,12 @@ from app.core.image_encoder import (
     prepare_image_for_encoding,
     save_options_for_plan,
 )
+from app.core.photoshop_bridge import (
+    PhotoshopAutomation,
+    PhotoshopBridgeError,
+    PhotoshopCompositeOptions,
+    read_photoshop_composite,
+)
 from app.core.resizer import (
     ResizePlanError,
     build_scale_plan,
@@ -413,6 +419,7 @@ def export_prepared_slices(
         exported_slices=tuple(exported),
         failures=tuple(failures),
         slice_issues=slice_result.issues,
+        composite_source=composite.source,
         composite_warning=composite.warning,
         source_unchanged=source_unchanged,
         elapsed_seconds=time.perf_counter() - started,
@@ -454,9 +461,11 @@ def export_slices(
     *,
     progress_callback: ProgressCallback | None = None,
     cancel_check: CancelCheck | None = None,
+    photoshop_automation: PhotoshopAutomation | None = None,
 ) -> ExportResult:
     """Open a PSD/PSB and export slices at original or target width."""
 
+    effective_options = options or ExportOptions()
     source = Path(source_path)
     if not source.is_file():
         raise ExportPreflightError(f"Source file does not exist: {source}")
@@ -474,6 +483,58 @@ def export_slices(
         if "psd" in locals():
             del psd
 
+    use_photoshop = (
+        effective_options.photoshop_fallback == "always"
+        or (
+            effective_options.photoshop_fallback == "if_needed"
+            and not composite.is_reliable
+        )
+    )
+    if use_photoshop:
+        if effective_options.photoshop_fallback == "always":
+            fallback_reason = (
+                "Photoshop rendering was explicitly requested."
+            )
+        else:
+            fallback_reason = (
+                composite.error
+                or composite.warning
+                or "The embedded composite could not be verified."
+            )
+        source_color_mode = composite.color_mode
+        source_depth = composite.depth
+        source_icc_profile = composite.icc_profile
+        expected_has_alpha = composite.has_alpha
+        if composite.image is not None:
+            composite.image.close()
+        try:
+            composite = read_photoshop_composite(
+                source,
+                expected_width=composite.width,
+                expected_height=composite.height,
+                source_color_mode=source_color_mode,
+                source_depth=source_depth,
+                source_icc_profile=source_icc_profile,
+                expected_has_alpha=expected_has_alpha,
+                options=PhotoshopCompositeOptions(
+                    allow_launch=(
+                        effective_options.photoshop_allow_launch
+                    ),
+                    png_compression=(
+                        effective_options.png_compress_level
+                    ),
+                ),
+                automation=photoshop_automation,
+            )
+            composite.warning = (
+                "Photoshop high-fidelity fallback was used. Reason: "
+                f"{fallback_reason}"
+            )
+        except PhotoshopBridgeError as error:
+            raise ExportPreflightError(
+                f"Photoshop high-fidelity fallback failed: {error}"
+            ) from error
+
     if composite.image is None:
         raise ExportPreflightError(
             composite.error or "No embedded composite is available for export."
@@ -483,7 +544,7 @@ def export_slices(
             source,
             slice_result,
             composite,
-            options or ExportOptions(),
+            effective_options,
             progress_callback=progress_callback,
             cancel_check=cancel_check,
         )
@@ -497,6 +558,7 @@ def export_original_size(
     *,
     progress_callback: ProgressCallback | None = None,
     cancel_check: CancelCheck | None = None,
+    photoshop_automation: PhotoshopAutomation | None = None,
 ) -> ExportResult:
     """Compatibility wrapper that always exports original dimensions."""
 
@@ -509,4 +571,5 @@ def export_original_size(
         original_options,
         progress_callback=progress_callback,
         cancel_check=cancel_check,
+        photoshop_automation=photoshop_automation,
     )

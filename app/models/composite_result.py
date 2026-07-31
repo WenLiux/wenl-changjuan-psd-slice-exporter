@@ -9,6 +9,7 @@ from PIL import Image
 CompositeSource = Literal[
     "embedded_merged",
     "embedded_merged_unverified",
+    "photoshop",
     "missing",
     "invalid",
 ]

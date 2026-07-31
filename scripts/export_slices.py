@@ -70,6 +70,18 @@ def main() -> None:
         dest="color_policy",
     )
     parser.add_argument("--allow-mode-conversion", action="store_true")
+    parser.add_argument(
+        "--photoshop",
+        choices=("disabled", "if_needed", "always"),
+        default="disabled",
+        dest="photoshop_fallback",
+        help="Use Photoshop only when explicitly selected.",
+    )
+    parser.add_argument(
+        "--allow-photoshop-launch",
+        action="store_true",
+        help="Allow starting Photoshop when no active instance exists.",
+    )
     args = parser.parse_args()
 
     try:
@@ -86,6 +98,8 @@ def main() -> None:
                 jpeg_background=args.background,
                 color_policy=args.color_policy,
                 allow_mode_conversion=args.allow_mode_conversion,
+                photoshop_fallback=args.photoshop_fallback,
+                photoshop_allow_launch=args.allow_photoshop_launch,
             ),
             progress_callback=print_progress,
         )
@@ -97,6 +111,7 @@ def main() -> None:
     print(f"output: {result.output_directory}")
     print(f"format: {result.output_format}")
     print(f"color-policy: {result.color_policy}")
+    print(f"composite-source: {result.composite_source}")
     print(f"target-width: {result.target_width}")
     print(f"scale: {result.scale:.8f}")
     print(f"resize-strategy: {result.resize_strategy}")

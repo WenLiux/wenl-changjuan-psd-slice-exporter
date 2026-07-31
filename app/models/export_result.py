@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from app.models.composite_result import CompositeSource
 from app.models.scale_plan import ResizeStrategy
 from app.models.slice_info import SliceInfo, SliceIssue
 from app.models.validation_report import ValidationReport
@@ -13,6 +14,7 @@ ExportStatus = Literal["completed", "completed_with_errors", "cancelled"]
 ProgressPhase = Literal["starting", "exporting", "written", "archiving"]
 OutputFormat = Literal["png", "jpeg"]
 ColorPolicy = Literal["auto", "preserve", "srgb"]
+PhotoshopFallbackMode = Literal["disabled", "if_needed", "always"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +31,8 @@ class ExportOptions:
     jpeg_background: tuple[int, int, int] = (255, 255, 255)
     color_policy: ColorPolicy = "auto"
     allow_mode_conversion: bool = False
+    photoshop_fallback: PhotoshopFallbackMode = "disabled"
+    photoshop_allow_launch: bool = False
     folder_label: str | None = None
     target_width: int | None = None
     allow_upscale: bool = True
@@ -49,6 +53,20 @@ class ExportOptions:
                 "Color policy must be auto, preserve, or srgb."
             )
         object.__setattr__(self, "color_policy", normalized_policy)
+        normalized_fallback = self.photoshop_fallback.lower()
+        if normalized_fallback not in {
+            "disabled",
+            "if_needed",
+            "always",
+        }:
+            raise ValueError(
+                "Photoshop fallback must be disabled, if_needed, or always."
+            )
+        object.__setattr__(
+            self,
+            "photoshop_fallback",
+            normalized_fallback,
+        )
         if not 0 <= self.png_compress_level <= 9:
             raise ValueError("PNG compression level must be between 0 and 9.")
         if not 1 <= self.jpeg_quality <= 100:
@@ -110,6 +128,7 @@ class ExportResult:
     exported_slices: tuple[ExportedSlice, ...]
     failures: tuple[ExportFailure, ...]
     slice_issues: tuple[SliceIssue, ...]
+    composite_source: CompositeSource
     composite_warning: str | None
     source_unchanged: bool
     elapsed_seconds: float
