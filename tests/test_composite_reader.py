@@ -201,3 +201,35 @@ def test_decode_failure_is_returned_as_user_readable_error() -> None:
     assert result.source == "invalid"
     assert "corrupt merged channels" in (result.error or "")
     assert result.requires_photoshop
+
+
+def test_lab_a_band_is_not_reported_as_alpha(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.core.composite_reader.has_transparency",
+        lambda psd: False,
+    )
+    psd = FakePSD(image=Image.new("LAB", (10, 20)))
+
+    result = read_embedded_composite(psd)
+
+    assert result.image is not None
+    assert not result.has_alpha
+    result.image.close()
+
+
+def test_unrepresentable_non_rgb_transparency_requires_photoshop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.core.composite_reader.has_transparency",
+        lambda psd: True,
+    )
+    psd = FakePSD(image=Image.new("CMYK", (10, 20)))
+
+    result = read_embedded_composite(psd)
+
+    assert result.image is None
+    assert result.requires_photoshop
+    assert "transparency" in (result.error or "")

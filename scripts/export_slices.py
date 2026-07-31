@@ -12,6 +12,23 @@ from app.models.export_result import ExportOptions, ExportProgress
 from app.services.export_service import ExportPreflightError, export_slices
 
 
+def parse_rgb(value: str) -> tuple[int, int, int]:
+    normalized = value.strip().lstrip("#")
+    if len(normalized) != 6:
+        raise argparse.ArgumentTypeError(
+            "Background must be a six-digit RGB hex color."
+        )
+    try:
+        return tuple(
+            int(normalized[offset : offset + 2], 16)
+            for offset in (0, 2, 4)
+        )
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            "Background must be a six-digit RGB hex color."
+        ) from error
+
+
 def print_progress(progress: ExportProgress) -> None:
     if progress.slice_info is None:
         print(f"{progress.phase}: {progress.current}/{progress.total}")
@@ -33,6 +50,26 @@ def main() -> None:
     parser.add_argument("--output-parent", type=Path)
     parser.add_argument("--zip", action="store_true", dest="create_zip")
     parser.add_argument("--allow-unverified", action="store_true")
+    parser.add_argument(
+        "--format",
+        choices=("png", "jpeg"),
+        default="png",
+        dest="output_format",
+    )
+    parser.add_argument("--jpeg-quality", type=int, default=95)
+    parser.add_argument(
+        "--background",
+        type=parse_rgb,
+        default=(255, 255, 255),
+        metavar="#RRGGBB",
+    )
+    parser.add_argument(
+        "--color",
+        choices=("auto", "preserve", "srgb"),
+        default="auto",
+        dest="color_policy",
+    )
+    parser.add_argument("--allow-mode-conversion", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -44,15 +81,22 @@ def main() -> None:
                 allow_unverified_composite=args.allow_unverified,
                 target_width=args.target_width,
                 allow_upscale=not args.no_upscale,
+                output_format=args.output_format,
+                jpeg_quality=args.jpeg_quality,
+                jpeg_background=args.background,
+                color_policy=args.color_policy,
+                allow_mode_conversion=args.allow_mode_conversion,
             ),
             progress_callback=print_progress,
         )
-    except ExportPreflightError as error:
+    except (ExportPreflightError, ValueError) as error:
         print(f"Export cannot start: {error}", file=sys.stderr)
         raise SystemExit(2) from error
 
     print(f"status: {result.status}")
     print(f"output: {result.output_directory}")
+    print(f"format: {result.output_format}")
+    print(f"color-policy: {result.color_policy}")
     print(f"target-width: {result.target_width}")
     print(f"scale: {result.scale:.8f}")
     print(f"resize-strategy: {result.resize_strategy}")

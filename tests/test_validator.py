@@ -105,3 +105,49 @@ def test_validation_report_writes_json_and_text(tmp_path: Path) -> None:
     assert payload["passed"] is True
     assert payload["warning_count"] == 1
     assert "Example warning." in text_path.read_text(encoding="utf-8")
+
+
+def test_grayscale_output_is_validated_without_band_unpack_error(
+    tmp_path: Path,
+) -> None:
+    source_image = Image.new("L", (5, 5), 127)
+    composite = CompositeResult(
+        image=source_image,
+        source="embedded_merged",
+        width=5,
+        height=5,
+        color_mode="GRAYSCALE",
+        depth=8,
+        pil_mode="L",
+        icc_profile=None,
+        has_alpha=False,
+        is_reliable=True,
+    )
+    info = slice_info(0, (0, 0, 5, 5))
+    mapped = MappedSlice(info, 0, 0, 5, 5)
+    output = tmp_path / "gray.png"
+    source_image.save(output)
+    exported = ExportedSlice(
+        info,
+        output,
+        5,
+        5,
+        "L",
+        output.stat().st_size,
+    )
+
+    report = validate_export_outputs(
+        [mapped],
+        [exported],
+        [],
+        composite=composite,
+        original_size=False,
+        expected_format="PNG",
+        expected_alpha=False,
+    )
+
+    assert "image_reopen_failed" not in {
+        item.code for item in report.findings
+    }
+    assert report.passed
+    source_image.close()

@@ -10,6 +10,12 @@ from PIL import Image
 from psd_tools import PSDImage
 
 from app.core.composite_reader import read_embedded_composite
+from app.core.image_encoder import (
+    ImageEncodingError,
+    build_image_encoding_plan,
+    prepare_image_for_encoding,
+    save_options_for_plan,
+)
 from app.core.resizer import (
     ResizePlanError,
     build_scale_plan,
@@ -85,9 +91,19 @@ def _emit(
     )
 
 
-def _verify_png(path: Path, expected_size: tuple[int, int]) -> tuple[str, int]:
+def _verify_image(
+    path: Path,
+    expected_size: tuple[int, int],
+    expected_format: str,
+) -> tuple[str, int]:
     with Image.open(path) as image:
+        actual_format = image.format
         image.verify()
+    if actual_format != expected_format:
+        raise ValueError(
+            f"Saved image format is {actual_format}; expected "
+            f"{expected_format}."
+        )
     with Image.open(path) as image:
         if image.size != expected_size:
             raise ValueError(
@@ -95,6 +111,10 @@ def _verify_png(path: Path, expected_size: tuple[int, int]) -> tuple[str, int]:
                 f"expected {expected_size[0]} x {expected_size[1]}."
             )
         mode = image.mode
+        if expected_format == "JPEG" and mode != "RGB":
+            raise ValueError(
+                f"Saved JPEG mode is {mode}; expected RGB."
+            )
     return mode, path.stat().st_size
 
 
@@ -143,6 +163,11 @@ def export_prepared_slices(
             f"Preflight validation found {preflight_report.error_count} "
             "blocking error(s)."
         )
+
+    try:
+        encoding_plan = build_image_encoding_plan(composite, options)
+    except ImageEncodingError as error:
+        raise ExportPreflightError(str(error)) from error
 
     try:
         scale_plan = build_scale_plan(
@@ -226,7 +251,7 @@ def export_prepared_slices(
 
             output_path = output_directory / (
                 f"slice_{position:02d}_{mapped_slice.width}x"
-                f"{mapped_slice.height}.png"
+                f"{mapped_slice.height}{encoding_plan.extension}"
             )
             temporary_path = output_path.with_name(f".{output_path.name}.part")
             _emit(
@@ -239,6 +264,7 @@ def export_prepared_slices(
             )
 
             crop: Image.Image | None = None
+            encoded_image: Image.Image | None = None
             try:
                 if resize_strategy == "per_slice":
                     crop = resize_mapped_slice(
@@ -251,17 +277,25 @@ def export_prepared_slices(
                     if render_image is None:
                         raise RuntimeError("Resize image is unavailable.")
                     crop = render_image.crop(mapped_slice.bounds)
-                save_options: dict[str, object] = {
-                    "format": "PNG",
-                    "compress_level": options.png_compress_level,
-                }
-                if composite.icc_profile:
-                    save_options["icc_profile"] = composite.icc_profile
-                crop.save(temporary_path, **save_options)
+                encoded_image = prepare_image_for_encoding(
+                    crop,
+                    encoding_plan,
+                )
+                save_options = save_options_for_plan(encoding_plan)
+                if encoding_plan.output_format == "png":
+                    save_options["compress_level"] = (
+                        options.png_compress_level
+                    )
+                encoded_image.save(temporary_path, **save_options)
                 temporary_path.replace(output_path)
-                mode, file_size = _verify_png(
+                mode, file_size = _verify_image(
                     output_path,
                     (mapped_slice.width, mapped_slice.height),
+                    (
+                        "PNG"
+                        if encoding_plan.output_format == "png"
+                        else "JPEG"
+                    ),
                 )
                 exported.append(
                     ExportedSlice(
@@ -296,6 +330,8 @@ def export_prepared_slices(
                     )
                 )
             finally:
+                if encoded_image is not None:
+                    encoded_image.close()
                 if crop is not None:
                     crop.close()
     finally:
@@ -308,6 +344,16 @@ def export_prepared_slices(
         failures,
         composite=composite,
         original_size=scale_plan.is_original_size,
+        exact_pixel_compare=(
+            scale_plan.is_original_size
+            and encoding_plan.exact_pixels_preserved
+        ),
+        expected_format=(
+            "PNG" if encoding_plan.output_format == "png" else "JPEG"
+        ),
+        expected_icc_profile=encoding_plan.output_icc_profile,
+        check_icc_profile=True,
+        expected_alpha=encoding_plan.expected_alpha,
     )
     validation_report = preflight_report.merged(post_export_report)
     if options.write_validation_reports:
@@ -370,6 +416,8 @@ def export_prepared_slices(
         composite_warning=composite.warning,
         source_unchanged=source_unchanged,
         elapsed_seconds=time.perf_counter() - started,
+        output_format=encoding_plan.output_format,
+        color_policy=encoding_plan.color_policy,
         target_width=scale_plan.output_width,
         scale=scale_plan.scale,
         resize_strategy=resize_strategy,

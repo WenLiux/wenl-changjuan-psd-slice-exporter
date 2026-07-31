@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import Any
 
 from psd_tools import PSDImage
+from psd_tools.api.utils import has_transparency
 from psd_tools.constants import Resource
 
 from app.models.composite_result import CompositeResult, CompositeSource
+from app.utils.image_modes import image_has_alpha
 
 
 class CompositeReaderError(RuntimeError):
@@ -30,6 +32,15 @@ def _image_resource(psd: Any, resource: Resource) -> Any | None:
         return psd.image_resources.get_data(resource)
     except (KeyError, TypeError):
         return None
+
+
+def _has_document_transparency(psd: Any, image: Any) -> bool:
+    try:
+        return bool(has_transparency(psd))
+    except (AttributeError, KeyError, TypeError):
+        # Lightweight test doubles and older compatible readers may not expose
+        # the low-level channel metadata used by psd-tools.
+        return image_has_alpha(image)
 
 
 def _unavailable_result(
@@ -136,6 +147,22 @@ def read_embedded_composite(psd: Any) -> CompositeResult:
             ),
         )
 
+    document_has_transparency = _has_document_transparency(psd, image)
+    decoded_has_alpha = image_has_alpha(image)
+    if document_has_transparency and not decoded_has_alpha:
+        decoded_mode = image.mode
+        image.close()
+        return _unavailable_result(
+            psd,
+            source="invalid",
+            icc_profile=icc_profile,
+            error=(
+                "The embedded composite contains transparency that cannot be "
+                f"represented in decoded {decoded_mode} mode without losing "
+                "data. Use Photoshop high-fidelity mode."
+            ),
+        )
+
     is_reliable = explicit_composite is True
     warning = None
     source: CompositeSource = "embedded_merged"
@@ -155,7 +182,7 @@ def read_embedded_composite(psd: Any) -> CompositeResult:
         depth=int(psd.depth),
         pil_mode=image.mode,
         icc_profile=icc_profile,
-        has_alpha="A" in image.getbands(),
+        has_alpha=document_has_transparency,
         is_reliable=is_reliable,
         warning=warning,
     )

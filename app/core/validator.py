@@ -10,6 +10,7 @@ from app.models.export_result import ExportedSlice, ExportFailure
 from app.models.scale_plan import MappedSlice
 from app.models.slice_info import SliceInfo
 from app.models.validation_report import ValidationFinding, ValidationReport
+from app.utils.image_modes import image_has_alpha
 
 
 def _overlap(
@@ -133,7 +134,14 @@ def validate_export_outputs(
     *,
     composite: CompositeResult,
     original_size: bool,
+    exact_pixel_compare: bool | None = None,
+    expected_format: str | None = None,
+    expected_icc_profile: bytes | None = None,
+    check_icc_profile: bool = False,
+    expected_alpha: bool | None = None,
 ) -> ValidationReport:
+    if exact_pixel_compare is None:
+        exact_pixel_compare = original_size
     findings: list[ValidationFinding] = []
     exported_by_index = {
         item.slice_info.index: item for item in exported_slices
@@ -184,6 +192,22 @@ def validate_export_outputs(
         try:
             with Image.open(path) as image:
                 image.load()
+                if (
+                    expected_format is not None
+                    and image.format != expected_format
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            phase="post_export",
+                            code="format_mismatch",
+                            severity="error",
+                            message=(
+                                f"Exported format is {image.format}; expected "
+                                f"{expected_format}."
+                            ),
+                            slice_indices=(mapped.slice_info.index,),
+                        )
+                    )
                 if image.size != (mapped.width, mapped.height):
                     findings.append(
                         ValidationFinding(
@@ -194,8 +218,71 @@ def validate_export_outputs(
                             slice_indices=(mapped.slice_info.index,),
                         )
                     )
+                if (
+                    expected_format == "JPEG"
+                    and image.mode != "RGB"
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            phase="post_export",
+                            code="jpeg_mode_mismatch",
+                            severity="error",
+                            message="Exported JPEG is not RGB.",
+                            slice_indices=(mapped.slice_info.index,),
+                        )
+                    )
+                if (
+                    expected_alpha is not None
+                    and image_has_alpha(image) != expected_alpha
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            phase="post_export",
+                            code="alpha_mismatch",
+                            severity="error",
+                            message=(
+                                "Exported alpha-channel behavior does not "
+                                "match the encoding plan."
+                            ),
+                            slice_indices=(mapped.slice_info.index,),
+                        )
+                    )
+                if (
+                    check_icc_profile
+                    and image.info.get("icc_profile")
+                    != expected_icc_profile
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            phase="post_export",
+                            code="icc_profile_mismatch",
+                            severity="error",
+                            message=(
+                                "Exported ICC profile does not match the "
+                                "encoding plan."
+                            ),
+                            slice_indices=(mapped.slice_info.index,),
+                        )
+                    )
                 extrema = image.getextrema()
-                if "A" in image.getbands() and extrema[-1][1] == 0:
+                band_extrema = (
+                    (extrema,)
+                    if extrema and isinstance(extrema[0], int)
+                    else extrema
+                )
+                if image_has_alpha(image):
+                    if "A" in image.getbands():
+                        alpha_index = image.getbands().index("A")
+                        alpha_extrema = band_extrema[alpha_index]
+                    else:
+                        rgba = image.convert("RGBA")
+                        try:
+                            alpha_extrema = rgba.getchannel("A").getextrema()
+                        finally:
+                            rgba.close()
+                else:
+                    alpha_extrema = None
+                if alpha_extrema is not None and alpha_extrema[1] == 0:
                     findings.append(
                         ValidationFinding(
                             phase="post_export",
@@ -205,7 +292,9 @@ def validate_export_outputs(
                             slice_indices=(mapped.slice_info.index,),
                         )
                     )
-                elif all(low == high for low, high in extrema):
+                elif all(
+                    low == high for low, high in band_extrema
+                ):
                     findings.append(
                         ValidationFinding(
                             phase="post_export",
@@ -217,7 +306,7 @@ def validate_export_outputs(
                     )
 
                 if (
-                    original_size
+                    exact_pixel_compare
                     and composite.image is not None
                     and image.size
                     == (mapped.slice_info.width, mapped.slice_info.height)
@@ -231,8 +320,8 @@ def validate_export_outputs(
                                     code="pixel_mismatch",
                                     severity="error",
                                     message=(
-                                        "Original-size PNG pixels differ from "
-                                        "the embedded composite."
+                                        "Lossless original-size output pixels "
+                                        "differ from the embedded composite."
                                     ),
                                     slice_indices=(mapped.slice_info.index,),
                                 )

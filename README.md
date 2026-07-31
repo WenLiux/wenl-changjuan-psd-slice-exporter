@@ -13,9 +13,10 @@ Completed:
 - Stage 3: collision-safe original-size folder export.
 - Stage 4: globally aligned target-width scaling.
 - Stage 5: structured preflight and post-export validation reports.
+- Stage 6: PNG/JPEG encoding and explicit color handling.
 
-Stage 6, PNG/JPEG and color management, is the next planned stage. The desktop
-UI has not started.
+Stage 7, the optional Photoshop high-fidelity fallback, is the next planned
+stage. The desktop UI has not started.
 
 Reports:
 
@@ -25,6 +26,7 @@ Reports:
 - `docs/stage-3-report.md`
 - `docs/stage-4-report.md`
 - `docs/stage-5-report.md`
+- `docs/stage-6-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -73,8 +75,30 @@ python scripts/export_slices.py input.psd --width 1440 --no-upscale
 
 Omit `--width` to preserve original dimensions.
 
+## PNG, JPEG, and color options
+
+PNG remains lossless and transparent by default:
+
+```powershell
+python scripts/export_slices.py input.psd --width 1440 --format png
+```
+
+JPEG defaults to quality 95, a white transparency background, and sRGB:
+
+```powershell
+python scripts/export_slices.py input.psd --width 1440 --format jpeg
+python scripts/export_slices.py input.psd --format jpeg `
+  --jpeg-quality 100 --background "#F5F5F5" --color srgb
+```
+
+PNG defaults to preserving the document ICC profile and channel values. JPEG
+defaults to sRGB. CMYK, 16-bit, and unsupported modes stop before export unless
+`--allow-mode-conversion` is supplied. Non-RGB conversion also requires a
+compatible embedded ICC profile; Photoshop high-fidelity mode is the
+recommended fallback when those safety conditions are not met.
+
 ## Current test result
 
 ```text
-38 passed
+51 passed
 ```
