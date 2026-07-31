@@ -1,6 +1,6 @@
 [project]
 name = "psd-slice-exporter"
-version = "0.0.0"
+version = "0.1.0"
 description = "High-fidelity PSD/PSB slice exporter"
 requires-python = ">=3.11,<3.15"
 dependencies = [

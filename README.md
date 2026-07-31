@@ -16,9 +16,9 @@ Completed:
 - Stage 6: PNG/JPEG encoding and explicit color handling.
 - Stage 7: optional Photoshop high-fidelity fallback with source protection.
 - Stage 8: responsive Windows desktop UI and reusable worker session.
+- Stage 9: reproducible Windows onedir packaging and packaged-app verification.
 
-Stage 9, Windows packaging and packaged-app verification, is the next planned
-stage.
+Stage 10, final release acceptance and handoff, is the next planned stage.
 
 Reports:
 
@@ -31,6 +31,7 @@ Reports:
 - `docs/stage-6-report.md`
 - `docs/stage-7-report.md`
 - `docs/stage-8-report.md`
+- `docs/stage-9-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -161,11 +162,40 @@ Settings are stored at:
 Photoshop launch, unverified-composite use, and mode conversion are one-run
 safety permissions and are never saved.
 
+## Windows release build
+
+Create a dedicated release environment and install the pinned build
+dependencies:
+
+```powershell
+python -m venv .venv-release
+.\.venv-release\Scripts\python.exe -m pip install -r requirements-build.txt
+```
+
+Build the windowed onedir application:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\build_windows.ps1
+```
+
+The application is created at:
+
+```text
+dist\PSD-PSB-Slice-Exporter\PSD-PSB-Slice-Exporter.exe
+```
+
+Keep the EXE, `_internal` directory, and `README-CN.txt` together. The
+distributable Windows ZIP is written to `release` and preserves that complete
+folder structure.
+
 ## Current test result
 
 ```text
-135 passed
+137 tests collected
+136 passed, 1 opt-in GUI test skipped
 ```
 
-This includes the real Windows GUI smoke export. See
-`docs/stage-8-report.md` for the verification matrix.
+The final packaged application was additionally exercised against both pinned
+PSD/PSB fixtures, launched as a real Windows GUI, and run again after extracting
+the distributable ZIP. See `docs/stage-9-report.md` for the release matrix.
