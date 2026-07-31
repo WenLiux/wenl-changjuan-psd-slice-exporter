@@ -5,18 +5,18 @@ Windows desktop tool project for exporting Photoshop slices without the legacy
 
 ## Current status
 
-Stage 0 is complete:
+Completed:
 
-- audit the existing standalone exporter;
-- preserve a byte-for-byte legacy baseline;
-- add regression tests for the verified PSD V8 and PSB V6 samples;
-- document risks and the Stage 1 extraction plan.
+- Stage 0: legacy audit and pixel-level regression baseline.
+- Stage 1: typed slice model and V6/V7/V8 parser extraction.
 
-The desktop UI and production module refactor have not started.
+Stage 2, composite reading, is the next planned stage. The desktop UI has not
+started.
 
 Reports:
 
 - `docs/stage-0-audit.md`
+- `docs/stage-1-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -45,3 +45,9 @@ python -m pytest
 ```
 
 See `tests/fixtures/README.md` for the pinned fixture fingerprints.
+
+## Current test result
+
+```text
+16 passed
+```
