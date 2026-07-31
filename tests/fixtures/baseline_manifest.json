@@ -1,0 +1,50 @@
+{
+  "psd_v8": {
+    "environment_variable": "PSD_SLICE_V8_FIXTURE",
+    "file_name": "565656未标题-1.psd",
+    "source_size": 135745016,
+    "source_sha256": "29d9f690872fae2013ed4fdd7aeb0becba01245b7e15dcef0ffd0bf19121a7d0",
+    "canvas": [1440, 28164],
+    "slice_resource_version": 8,
+    "outputs": [
+      ["slice_01_1440x3024.png", 1440, 3024, "RGBA", "924a1b756ab5ab0a845d89fc1a49d6a26ff379064c46cfc772ae46282cf6d003"],
+      ["slice_02_1440x2329.png", 1440, 2329, "RGBA", "c87e3b5b675494563064d8bdd44bd3c884e487d9bdabf53a790fccf07dee3fb9"],
+      ["slice_03_1440x1989.png", 1440, 1989, "RGBA", "8694f6c35ad95641a5797b7f644d62237f68ea9638b4fa10206857a98e0c1067"],
+      ["slice_04_1440x1990.png", 1440, 1990, "RGBA", "a8bf78d1b5a5e82a87b7bd55204b0dcd6486a01d9b7f2cdf5685d51387bb2bb4"],
+      ["slice_05_1440x2312.png", 1440, 2312, "RGBA", "75e509d9c94c04433d8ecbf076368b97423913b013b6466e42dacaca39dfa8e1"],
+      ["slice_06_1440x2030.png", 1440, 2030, "RGBA", "c91b4b19a3d597f7dbf297957e23f6e06d4a078aae383b27dfa44859f12333ff"],
+      ["slice_07_1440x2072.png", 1440, 2072, "RGBA", "a08892298d0acd2294a0b1964d285e6faea5b415029bc79207bc94132e69ee77"],
+      ["slice_08_1440x1554.png", 1440, 1554, "RGBA", "d0a9a32e5d9e936e5d9192104d30c6f7dd507498b6bba9d91f634e64a36c328b"],
+      ["slice_09_1440x2506.png", 1440, 2506, "RGBA", "25cab79acbaf48fd341a83090c5ecb319d3ca86fac6a4241c82755750c676657"],
+      ["slice_10_1440x1857.png", 1440, 1857, "RGBA", "121c4431140e65f042b75273c6182a25d34a8f05fc1553386878fbdcfe059213"],
+      ["slice_11_1440x1917.png", 1440, 1917, "RGBA", "6332aef5b47440998309392a0b8338489a0e07d2244c97eb06901d6507932497"],
+      ["slice_12_1440x1677.png", 1440, 1677, "RGBA", "8325ddca7e69fc48313db61da47b86886793c41652027e6185ca7149acae5d0e"],
+      ["slice_13_1440x1555.png", 1440, 1555, "RGBA", "8ccb9ec772a9f3f41e45f7920fb287e6959e1013461189fc508865f275cc867f"],
+      ["slice_14_1440x1352.png", 1440, 1352, "RGBA", "32eb6a81155b5dcc226bdbc1703c6996ac8f5dec016d4de8feb39e0e90584218"]
+    ]
+  },
+  "psb_v6": {
+    "environment_variable": "PSD_SLICE_V6_FIXTURE",
+    "file_name": "详情切片.psb",
+    "source_size": 142684479,
+    "source_sha256": "e7b23a21574a3f5f442921c39a7ad5a9dad68d8746001f4277cda82b524ae288",
+    "canvas": [1440, 31044],
+    "slice_resource_version": 6,
+    "outputs": [
+      ["slice_01_1440x2915.png", 1440, 2915, "RGBA", "2cb757854d7ec17d5640237279fea03cb049fec427ed0639e922c0f722505cd2"],
+      ["slice_02_1440x2989.png", 1440, 2989, "RGBA", "54668d603ef5626728a6389660ec4dede09931777b54ca6c64992ad5e53fc0bf"],
+      ["slice_03_1440x2329.png", 1440, 2329, "RGBA", "c87e3b5b675494563064d8bdd44bd3c884e487d9bdabf53a790fccf07dee3fb9"],
+      ["slice_04_1440x1989.png", 1440, 1989, "RGBA", "8694f6c35ad95641a5797b7f644d62237f68ea9638b4fa10206857a98e0c1067"],
+      ["slice_05_1440x1990.png", 1440, 1990, "RGBA", "a8bf78d1b5a5e82a87b7bd55204b0dcd6486a01d9b7f2cdf5685d51387bb2bb4"],
+      ["slice_06_1440x2312.png", 1440, 2312, "RGBA", "75e509d9c94c04433d8ecbf076368b97423913b013b6466e42dacaca39dfa8e1"],
+      ["slice_07_1440x2030.png", 1440, 2030, "RGBA", "c91b4b19a3d597f7dbf297957e23f6e06d4a078aae383b27dfa44859f12333ff"],
+      ["slice_08_1440x2072.png", 1440, 2072, "RGBA", "a08892298d0acd2294a0b1964d285e6faea5b415029bc79207bc94132e69ee77"],
+      ["slice_09_1440x1554.png", 1440, 1554, "RGBA", "d0a9a32e5d9e936e5d9192104d30c6f7dd507498b6bba9d91f634e64a36c328b"],
+      ["slice_10_1440x2506.png", 1440, 2506, "RGBA", "25cab79acbaf48fd341a83090c5ecb319d3ca86fac6a4241c82755750c676657"],
+      ["slice_11_1440x1857.png", 1440, 1857, "RGBA", "121c4431140e65f042b75273c6182a25d34a8f05fc1553386878fbdcfe059213"],
+      ["slice_12_1440x1917.png", 1440, 1917, "RGBA", "6332aef5b47440998309392a0b8338489a0e07d2244c97eb06901d6507932497"],
+      ["slice_13_1440x1677.png", 1440, 1677, "RGBA", "8325ddca7e69fc48313db61da47b86886793c41652027e6185ca7149acae5d0e"],
+      ["slice_14_1440x2907.png", 1440, 2907, "RGBA", "dee743b3a711fd506a9c7ad8e8eac85db5663a22688ef8928c42af951cea6f83"]
+    ]
+  }
+}
