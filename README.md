@@ -17,8 +17,9 @@ Completed:
 - Stage 7: optional Photoshop high-fidelity fallback with source protection.
 - Stage 8: responsive Windows desktop UI and reusable worker session.
 - Stage 9: reproducible Windows onedir packaging and packaged-app verification.
+- Stage 10: final release acceptance and Windows artifact handoff.
 
-Stage 10, final release acceptance and handoff, is the next planned stage.
+Version 0.1.0 is complete.
 
 Reports:
 
@@ -32,6 +33,7 @@ Reports:
 - `docs/stage-7-report.md`
 - `docs/stage-8-report.md`
 - `docs/stage-9-report.md`
+- `docs/stage-10-acceptance.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
