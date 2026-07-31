@@ -9,14 +9,16 @@ Completed:
 
 - Stage 0: legacy audit and pixel-level regression baseline.
 - Stage 1: typed slice model and V6/V7/V8 parser extraction.
+- Stage 2: reliable embedded-composite reader.
 
-Stage 2, composite reading, is the next planned stage. The desktop UI has not
-started.
+Stage 3, original-size folder export, is the next planned stage. The desktop
+UI has not started.
 
 Reports:
 
 - `docs/stage-0-audit.md`
 - `docs/stage-1-report.md`
+- `docs/stage-2-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -49,5 +51,5 @@ See `tests/fixtures/README.md` for the pinned fixture fingerprints.
 ## Current test result
 
 ```text
-16 passed
+23 passed
 ```
