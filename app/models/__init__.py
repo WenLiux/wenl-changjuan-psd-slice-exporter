@@ -11,6 +11,7 @@ from .export_result import (
 )
 from .scale_plan import MappedSlice, ResizeStrategy, ScalePlan
 from .slice_info import SliceInfo, SliceIssue, SliceParseResult
+from .validation_report import ValidationFinding, ValidationReport
 
 __all__ = [
     "CompositeResult",
@@ -27,4 +28,6 @@ __all__ = [
     "SliceInfo",
     "SliceIssue",
     "SliceParseResult",
+    "ValidationFinding",
+    "ValidationReport",
 ]

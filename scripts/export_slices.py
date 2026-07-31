@@ -59,6 +59,10 @@ def main() -> None:
     print(f"exported: {len(result.exported_slices)}")
     if result.archive_path:
         print(f"zip: {result.archive_path}")
+    if result.validation_json_path:
+        print(f"validation-json: {result.validation_json_path}")
+    if result.validation_text_path:
+        print(f"validation-text: {result.validation_text_path}")
     for failure in result.failures:
         print(f"error: {failure.message}", file=sys.stderr)
     raise SystemExit(0 if result.success else 1)

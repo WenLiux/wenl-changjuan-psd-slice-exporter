@@ -17,6 +17,7 @@ from app.core.resizer import (
     resize_mapped_slice,
 )
 from app.core.slice_parser import parse_document_slices
+from app.core.validator import validate_export_outputs, validate_slice_layout
 from app.models.composite_result import CompositeResult
 from app.models.export_result import (
     ExportedSlice,
@@ -132,6 +133,17 @@ def export_prepared_slices(
     if not slices:
         raise ExportPreflightError("There are no exportable slices selected.")
 
+    preflight_report = validate_slice_layout(
+        slices,
+        canvas_width=composite.width,
+        canvas_height=composite.height,
+    )
+    if not preflight_report.passed:
+        raise ExportPreflightError(
+            f"Preflight validation found {preflight_report.error_count} "
+            "blocking error(s)."
+        )
+
     try:
         scale_plan = build_scale_plan(
             canvas_width=composite.width,
@@ -157,6 +169,8 @@ def export_prepared_slices(
     exported: list[ExportedSlice] = []
     failures: list[ExportFailure] = []
     archive_path: Path | None = None
+    validation_json_path: Path | None = None
+    validation_text_path: Path | None = None
     cancelled = False
     total = len(slices)
     resized_composite: Image.Image | None = None
@@ -288,10 +302,31 @@ def export_prepared_slices(
         if resized_composite is not None:
             resized_composite.close()
 
+    post_export_report = validate_export_outputs(
+        scale_plan.mapped_slices,
+        exported,
+        failures,
+        composite=composite,
+        original_size=scale_plan.is_original_size,
+    )
+    validation_report = preflight_report.merged(post_export_report)
+    if options.write_validation_reports:
+        try:
+            validation_json_path, validation_text_path = (
+                validation_report.write(output_directory)
+            )
+        except Exception as error:
+            failures.append(
+                ExportFailure(
+                    message=f"Validation report could not be written: {error}",
+                    exception_type=type(error).__name__,
+                )
+            )
+
     status: ExportStatus
     if cancelled:
         status = "cancelled"
-    elif failures:
+    elif failures or not validation_report.passed:
         status = "completed_with_errors"
     else:
         status = "completed"
@@ -338,6 +373,9 @@ def export_prepared_slices(
         target_width=scale_plan.output_width,
         scale=scale_plan.scale,
         resize_strategy=resize_strategy,
+        validation_report=validation_report,
+        validation_json_path=validation_json_path,
+        validation_text_path=validation_text_path,
     )
 
 

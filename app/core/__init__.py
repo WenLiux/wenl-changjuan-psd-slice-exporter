@@ -20,6 +20,7 @@ from .slice_parser import (
     parse_document_slices,
     parse_slice_resource,
 )
+from .validator import validate_export_outputs, validate_slice_layout
 
 __all__ = [
     "CompositeOpenError",
@@ -34,6 +35,8 @@ __all__ = [
     "read_embedded_composite",
     "resize_full_composite",
     "resize_mapped_slice",
+    "validate_export_outputs",
+    "validate_slice_layout",
     "parse_document_slices",
     "parse_slice_resource",
 ]

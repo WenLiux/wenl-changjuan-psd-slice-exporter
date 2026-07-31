@@ -12,9 +12,10 @@ Completed:
 - Stage 2: reliable embedded-composite reader.
 - Stage 3: collision-safe original-size folder export.
 - Stage 4: globally aligned target-width scaling.
+- Stage 5: structured preflight and post-export validation reports.
 
-Stage 5, validation reports, is the next planned stage. The desktop UI has not
-started.
+Stage 6, PNG/JPEG and color management, is the next planned stage. The desktop
+UI has not started.
 
 Reports:
 
@@ -23,6 +24,7 @@ Reports:
 - `docs/stage-2-report.md`
 - `docs/stage-3-report.md`
 - `docs/stage-4-report.md`
+- `docs/stage-5-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -74,5 +76,5 @@ Omit `--width` to preserve original dimensions.
 ## Current test result
 
 ```text
-35 passed
+38 passed
 ```

@@ -6,6 +6,7 @@ from typing import Literal
 
 from app.models.scale_plan import ResizeStrategy
 from app.models.slice_info import SliceInfo, SliceIssue
+from app.models.validation_report import ValidationReport
 
 
 ExportStatus = Literal["completed", "completed_with_errors", "cancelled"]
@@ -26,6 +27,7 @@ class ExportOptions:
     allow_upscale: bool = True
     max_full_resize_bytes: int = 512 * 1024 * 1024
     resize_edge_padding: int = 8
+    write_validation_reports: bool = True
 
     def __post_init__(self) -> None:
         if not 0 <= self.png_compress_level <= 9:
@@ -82,6 +84,9 @@ class ExportResult:
     target_width: int
     scale: float
     resize_strategy: ResizeStrategy
+    validation_report: ValidationReport
+    validation_json_path: Path | None
+    validation_text_path: Path | None
 
     @property
     def success(self) -> bool:

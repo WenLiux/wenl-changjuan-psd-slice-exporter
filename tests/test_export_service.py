@@ -127,6 +127,11 @@ def test_real_fixture_original_export_matches_baseline(
     assert result.status == "completed"
     assert result.archive_path is None
     assert result.source_unchanged
+    assert result.validation_report.passed
+    assert result.validation_json_path is not None
+    assert result.validation_json_path.is_file()
+    assert result.validation_text_path is not None
+    assert result.validation_text_path.is_file()
     assert source.stat().st_size == source_stat.st_size
     assert source.stat().st_mtime_ns == source_stat.st_mtime_ns
     assert [item.output_path.name for item in result.exported_slices] == [
@@ -171,6 +176,8 @@ def test_output_directories_are_collision_safe_and_zip_is_opt_in(
         assert sorted(archive.namelist()) == [
             "slice_01_10x10.png",
             "slice_02_10x10.png",
+            "validation_report.json",
+            "validation_report.txt",
         ]
 
     first_composite.image.close()
