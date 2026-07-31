@@ -151,3 +151,36 @@ def test_grayscale_output_is_validated_without_band_unpack_error(
     }
     assert report.passed
     source_image.close()
+
+
+def test_post_export_validation_honors_cancellation(
+    tmp_path: Path,
+) -> None:
+    source_image = Image.new("RGB", (5, 5), (1, 2, 3))
+    composite = CompositeResult(
+        image=source_image,
+        source="embedded_merged",
+        width=5,
+        height=5,
+        color_mode="RGB",
+        depth=8,
+        pil_mode="RGB",
+        icc_profile=None,
+        has_alpha=False,
+        is_reliable=True,
+    )
+    info = slice_info(0, (0, 0, 5, 5))
+
+    report = validate_export_outputs(
+        [MappedSlice(info, 0, 0, 5, 5)],
+        [],
+        [],
+        composite=composite,
+        original_size=False,
+        cancel_check=lambda: True,
+    )
+
+    assert "validation_cancelled" in {
+        finding.code for finding in report.findings
+    }
+    source_image.close()

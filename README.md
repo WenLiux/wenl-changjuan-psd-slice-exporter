@@ -15,8 +15,10 @@ Completed:
 - Stage 5: structured preflight and post-export validation reports.
 - Stage 6: PNG/JPEG encoding and explicit color handling.
 - Stage 7: optional Photoshop high-fidelity fallback with source protection.
+- Stage 8: responsive Windows desktop UI and reusable worker session.
 
-Stage 8, the responsive Windows desktop UI, is the next planned stage.
+Stage 9, Windows packaging and packaged-app verification, is the next planned
+stage.
 
 Reports:
 
@@ -28,6 +30,7 @@ Reports:
 - `docs/stage-5-report.md`
 - `docs/stage-6-report.md`
 - `docs/stage-7-report.md`
+- `docs/stage-8-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -118,8 +121,51 @@ saving, never quits Photoshop, and verifies the original SHA-256, size, and
 modification time before and after. V1 Photoshop fallback is restricted to
 8-bit RGB documents.
 
+## Windows desktop application
+
+Install the normal UI dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Install the optional Photoshop bridge when fallback is required:
+
+```powershell
+python -m pip install -r requirements-photoshop.txt
+```
+
+Start the application:
+
+```powershell
+python -m app.main
+```
+
+or:
+
+```powershell
+python scripts/run_gui.py
+```
+
+The UI supports file selection and drag-and-drop, original or custom width,
+slice selection, PNG/JPEG and color controls, safe Photoshop fallback,
+collision-safe output, ZIP creation, progress, cancellation, validation
+reports, and repeat export without reparsing the open PSD/PSB.
+
+Settings are stored at:
+
+```text
+%APPDATA%\PSD Slice Exporter\settings.json
+```
+
+Photoshop launch, unverified-composite use, and mode conversion are one-run
+safety permissions and are never saved.
+
 ## Current test result
 
 ```text
-65 passed
+135 passed
 ```
+
+This includes the real Windows GUI smoke export. See
+`docs/stage-8-report.md` for the verification matrix.

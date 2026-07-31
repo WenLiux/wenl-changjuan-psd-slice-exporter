@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from PIL import Image, ImageChops
@@ -139,6 +139,8 @@ def validate_export_outputs(
     expected_icc_profile: bytes | None = None,
     check_icc_profile: bool = False,
     expected_alpha: bool | None = None,
+    cancel_check: Callable[[], bool] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> ValidationReport:
     if exact_pixel_compare is None:
         exact_pixel_compare = original_size
@@ -173,7 +175,22 @@ def validate_export_outputs(
             )
         )
 
-    for mapped in mapped_slices:
+    for position, mapped in enumerate(mapped_slices, start=1):
+        if cancel_check is not None and cancel_check():
+            findings.append(
+                ValidationFinding(
+                    phase="post_export",
+                    code="validation_cancelled",
+                    severity="warning",
+                    message=(
+                        "Output validation was stopped because cancellation "
+                        "was requested."
+                    ),
+                )
+            )
+            break
+        if progress_callback is not None:
+            progress_callback(position, len(mapped_slices))
         exported = exported_by_index.get(mapped.slice_info.index)
         if exported is None:
             continue

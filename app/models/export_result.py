@@ -11,10 +11,27 @@ from app.models.validation_report import ValidationReport
 
 
 ExportStatus = Literal["completed", "completed_with_errors", "cancelled"]
-ProgressPhase = Literal["starting", "exporting", "written", "archiving"]
+ProgressPhase = Literal[
+    "preparing",
+    "parsing",
+    "reading_composite",
+    "photoshop",
+    "resizing",
+    "starting",
+    "exporting",
+    "written",
+    "validating",
+    "archiving",
+]
 OutputFormat = Literal["png", "jpeg"]
 ColorPolicy = Literal["auto", "preserve", "srgb"]
 PhotoshopFallbackMode = Literal["disabled", "if_needed", "always"]
+NamingRule = Literal[
+    "legacy_sequence_dimensions",
+    "sequence_dimensions",
+    "slice_name",
+    "slice_name_with_index",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +50,7 @@ class ExportOptions:
     allow_mode_conversion: bool = False
     photoshop_fallback: PhotoshopFallbackMode = "disabled"
     photoshop_allow_launch: bool = False
+    naming_rule: NamingRule = "legacy_sequence_dimensions"
     folder_label: str | None = None
     target_width: int | None = None
     allow_upscale: bool = True
@@ -67,6 +85,19 @@ class ExportOptions:
             "photoshop_fallback",
             normalized_fallback,
         )
+        normalized_naming = self.naming_rule.lower()
+        if normalized_naming not in {
+            "legacy_sequence_dimensions",
+            "sequence_dimensions",
+            "slice_name",
+            "slice_name_with_index",
+        }:
+            raise ValueError(
+                "Naming rule must be legacy_sequence_dimensions, "
+                "sequence_dimensions, slice_name, or "
+                "slice_name_with_index."
+            )
+        object.__setattr__(self, "naming_rule", normalized_naming)
         if not 0 <= self.png_compress_level <= 9:
             raise ValueError("PNG compression level must be between 0 and 9.")
         if not 1 <= self.jpeg_quality <= 100:

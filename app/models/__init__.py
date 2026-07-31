@@ -9,8 +9,15 @@ from .export_result import (
     ExportProgress,
     ExportResult,
     ExportStatus,
+    NamingRule,
     OutputFormat,
     PhotoshopFallbackMode,
+)
+from .prepared_document import (
+    DocumentLoadResult,
+    DocumentSummary,
+    PreparedDocument,
+    SourceFingerprint,
 )
 from .scale_plan import MappedSlice, ResizeStrategy, ScalePlan
 from .slice_info import SliceInfo, SliceIssue, SliceParseResult
@@ -26,8 +33,13 @@ __all__ = [
     "ExportProgress",
     "ExportResult",
     "ExportStatus",
+    "NamingRule",
     "OutputFormat",
     "PhotoshopFallbackMode",
+    "DocumentSummary",
+    "DocumentLoadResult",
+    "PreparedDocument",
+    "SourceFingerprint",
     "MappedSlice",
     "ResizeStrategy",
     "ScalePlan",

@@ -9,11 +9,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import app.services.export_service as export_service_module
+import app.services.document_service as document_service_module
 from app.models.composite_result import CompositeResult
 from app.models.export_result import ExportOptions, ExportProgress
 from app.models.slice_info import SliceInfo, SliceParseResult
 from app.services.export_service import (
+    ExportCancelledError,
     ExportPreflightError,
     export_original_size,
     export_prepared_original_size,
@@ -185,6 +186,32 @@ def test_output_directories_are_collision_safe_and_zip_is_opt_in(
     second_composite.image.close()
 
 
+def test_zip_cancellation_removes_partial_archive(tmp_path: Path) -> None:
+    source = tmp_path / "cancel-zip.psd"
+    slices, composite = prepared_document(source)
+    cancellation_requested = False
+
+    def progress_callback(progress: ExportProgress) -> None:
+        nonlocal cancellation_requested
+        if progress.phase == "archiving" and progress.current == 1:
+            cancellation_requested = True
+
+    result = export_prepared_original_size(
+        source,
+        slices,
+        composite,
+        ExportOptions(output_parent=tmp_path, create_zip=True),
+        progress_callback=progress_callback,
+        cancel_check=lambda: cancellation_requested,
+    )
+
+    assert result.status == "cancelled"
+    assert result.archive_path is None
+    assert not result.output_directory.with_suffix(".zip").exists()
+    assert list(tmp_path.glob(".*.zip.part")) == []
+    composite.image.close()
+
+
 def test_cancellation_is_checked_between_slices(tmp_path: Path) -> None:
     source = tmp_path / "cancel.psd"
     slices, composite = prepared_document(source)
@@ -194,7 +221,7 @@ def test_cancellation_is_checked_between_slices(tmp_path: Path) -> None:
     def cancel_check() -> bool:
         nonlocal checks
         checks += 1
-        return checks > 1
+        return checks > 2
 
     result = export_prepared_original_size(
         source,
@@ -211,9 +238,79 @@ def test_cancellation_is_checked_between_slices(tmp_path: Path) -> None:
         "starting",
         "exporting",
         "written",
+        "validating",
     ]
     assert not result.archive_path
     composite.image.close()
+
+
+def test_cancellation_before_parse_does_not_open_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "cancel-before-parse.psd"
+    source.write_bytes(b"fixture")
+    progress: list[ExportProgress] = []
+    monkeypatch.setattr(
+        document_service_module.PSDImage,
+        "open",
+        lambda path: pytest.fail("Cancelled exports must not open the PSD."),
+    )
+
+    with pytest.raises(ExportCancelledError, match="cancelled"):
+        export_slices(
+            source,
+            progress_callback=progress.append,
+            cancel_check=lambda: True,
+        )
+
+    assert [item.phase for item in progress] == ["preparing"]
+
+
+def test_cancellation_after_parse_skips_composite_decode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "cancel-after-parse.psd"
+    slices, composite = prepared_document(source)
+    composite.image.close()
+    checks = 0
+    progress: list[ExportProgress] = []
+
+    def cancel_check() -> bool:
+        nonlocal checks
+        checks += 1
+        return checks >= 2
+
+    monkeypatch.setattr(
+        document_service_module.PSDImage,
+        "open",
+        lambda path: object(),
+    )
+    monkeypatch.setattr(
+        document_service_module,
+        "parse_document_slices",
+        lambda psd: slices,
+    )
+    monkeypatch.setattr(
+        document_service_module,
+        "read_embedded_composite",
+        lambda psd: pytest.fail(
+            "Cancelled exports must not decode the composite."
+        ),
+    )
+
+    with pytest.raises(ExportCancelledError, match="cancelled"):
+        export_slices(
+            source,
+            progress_callback=progress.append,
+            cancel_check=cancel_check,
+        )
+
+    assert [item.phase for item in progress] == [
+        "preparing",
+        "parsing",
+    ]
 
 
 def test_unverified_composite_requires_explicit_permission(
@@ -286,6 +383,47 @@ def test_prepared_target_width_export_reports_scale_and_strategy(
         (5, 5),
         (5, 5),
     ]
+    composite.image.close()
+
+
+@pytest.mark.parametrize(
+    ("naming_rule", "expected_names"),
+    [
+        (
+            "sequence_dimensions",
+            ["01_10x10.png", "02_10x10.png"],
+        ),
+        (
+            "slice_name",
+            ["top_10x10.png", "bottom_10x10.png"],
+        ),
+        (
+            "slice_name_with_index",
+            ["01_top_10x10.png", "02_bottom_10x10.png"],
+        ),
+    ],
+)
+def test_output_naming_rules(
+    tmp_path: Path,
+    naming_rule: str,
+    expected_names: list[str],
+) -> None:
+    source = tmp_path / "naming.psd"
+    slices, composite = prepared_document(source)
+
+    result = export_prepared_slices(
+        source,
+        slices,
+        composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            naming_rule=naming_rule,
+        ),
+    )
+
+    assert [
+        item.output_path.name for item in result.exported_slices
+    ] == expected_names
     composite.image.close()
 
 
@@ -380,17 +518,17 @@ def test_if_needed_photoshop_fallback_replaces_missing_composite(
     calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(
-        export_service_module.PSDImage,
+        document_service_module.PSDImage,
         "open",
         lambda path: object(),
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "parse_document_slices",
         lambda psd: slices,
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_embedded_composite",
         lambda psd: missing,
     )
@@ -403,7 +541,7 @@ def test_if_needed_photoshop_fallback_replaces_missing_composite(
         return photoshop
 
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_photoshop_composite",
         fake_photoshop,
     )
@@ -447,22 +585,22 @@ def test_disabled_photoshop_fallback_preserves_existing_failure_path(
         error="No embedded composite.",
     )
     monkeypatch.setattr(
-        export_service_module.PSDImage,
+        document_service_module.PSDImage,
         "open",
         lambda path: object(),
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "parse_document_slices",
         lambda psd: slices,
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_embedded_composite",
         lambda psd: missing,
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_photoshop_composite",
         lambda *args, **kwargs: pytest.fail(
             "Photoshop must remain disabled by default."
@@ -486,22 +624,22 @@ def test_if_needed_fallback_skips_reliable_embedded_composite(
     source = tmp_path / "reliable.psd"
     slices, composite = prepared_document(source)
     monkeypatch.setattr(
-        export_service_module.PSDImage,
+        document_service_module.PSDImage,
         "open",
         lambda path: object(),
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "parse_document_slices",
         lambda psd: slices,
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_embedded_composite",
         lambda psd: composite,
     )
     monkeypatch.setattr(
-        export_service_module,
+        document_service_module,
         "read_photoshop_composite",
         lambda *args, **kwargs: pytest.fail(
             "Reliable composites must not start Photoshop."

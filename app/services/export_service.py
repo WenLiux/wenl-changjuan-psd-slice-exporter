@@ -1,60 +1,50 @@
 from __future__ import annotations
 
-import shutil
 import time
-from collections.abc import Callable
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image
-from psd_tools import PSDImage
 
-from app.core.composite_reader import read_embedded_composite
 from app.core.image_encoder import (
     ImageEncodingError,
     build_image_encoding_plan,
     prepare_image_for_encoding,
     save_options_for_plan,
 )
-from app.core.photoshop_bridge import (
-    PhotoshopAutomation,
-    PhotoshopBridgeError,
-    PhotoshopCompositeOptions,
-    read_photoshop_composite,
-)
+from app.core.photoshop_bridge import PhotoshopAutomation
 from app.core.resizer import (
     ResizePlanError,
     build_scale_plan,
     resize_full_composite,
     resize_mapped_slice,
 )
-from app.core.slice_parser import parse_document_slices
 from app.core.validator import validate_export_outputs, validate_slice_layout
 from app.models.composite_result import CompositeResult
 from app.models.export_result import (
     ExportedSlice,
     ExportFailure,
     ExportOptions,
-    ExportProgress,
     ExportResult,
     ExportStatus,
-    ProgressPhase,
 )
-from app.models.scale_plan import ResizeStrategy
+from app.models.scale_plan import MappedSlice, ResizeStrategy
 from app.models.slice_info import SliceInfo, SliceParseResult
+from app.services.document_service import prepare_document
+from app.services.errors import (
+    ExportCancelledError,
+    ExportPreflightError,
+)
+from app.services.progress import (
+    CancelCheck,
+    ProgressCallback,
+    emit_progress as _emit,
+    is_cancelled as _is_cancelled,
+    raise_if_cancelled as _raise_if_cancelled,
+)
+from app.utils.filenames import safe_filename_component
 from app.utils.paths import create_collision_safe_directory
-
-
-ProgressCallback = Callable[[ExportProgress], None]
-CancelCheck = Callable[[], bool]
-
-
-class ExportServiceError(RuntimeError):
-    """Base class for user-facing export service errors."""
-
-
-class ExportPreflightError(ExportServiceError):
-    """Raised before output is created when export cannot safely proceed."""
 
 
 def _source_signature(path: Path) -> tuple[int, int] | None:
@@ -73,28 +63,6 @@ def _selected_slices(
     if selected_indices is None:
         return slices
     return [item for item in slices if item.index in selected_indices]
-
-
-def _emit(
-    callback: ProgressCallback | None,
-    *,
-    phase: ProgressPhase,
-    current: int,
-    total: int,
-    slice_info: SliceInfo | None = None,
-    output_path: Path | None = None,
-) -> None:
-    if callback is None:
-        return
-    callback(
-        ExportProgress(
-            phase=phase,
-            current=current,
-            total=total,
-            slice_info=slice_info,
-            output_path=output_path,
-        )
-    )
 
 
 def _verify_image(
@@ -124,6 +92,73 @@ def _verify_image(
     return mode, path.stat().st_size
 
 
+def _create_zip_archive(
+    output_directory: Path,
+    *,
+    cancel_check: CancelCheck | None,
+    progress_callback: ProgressCallback | None,
+) -> tuple[Path | None, bool]:
+    archive_path = output_directory.with_suffix(".zip")
+    temporary_path = archive_path.with_name(f".{archive_path.name}.part")
+    files = sorted(
+        path for path in output_directory.rglob("*") if path.is_file()
+    )
+    try:
+        with zipfile.ZipFile(
+            temporary_path,
+            mode="x",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as archive:
+            for position, path in enumerate(files, start=1):
+                if _is_cancelled(cancel_check):
+                    return None, True
+                _emit(
+                    progress_callback,
+                    phase="archiving",
+                    current=position,
+                    total=len(files),
+                    output_path=path,
+                )
+                archive.write(path, path.relative_to(output_directory))
+        temporary_path.replace(archive_path)
+        return archive_path, False
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
+
+
+def _output_filename(
+    mapped_slice: MappedSlice,
+    *,
+    position: int,
+    extension: str,
+    naming_rule: str,
+    used_names: set[str],
+) -> str:
+    dimensions = f"{mapped_slice.width}x{mapped_slice.height}"
+    if naming_rule == "legacy_sequence_dimensions":
+        stem = f"slice_{position:02d}_{dimensions}"
+    elif naming_rule == "sequence_dimensions":
+        stem = f"{position:02d}_{dimensions}"
+    else:
+        name = safe_filename_component(
+            mapped_slice.slice_info.name,
+            fallback=f"slice_{position:02d}",
+        )
+        if naming_rule == "slice_name_with_index":
+            stem = f"{position:02d}_{name}_{dimensions}"
+        else:
+            stem = f"{name}_{dimensions}"
+
+    candidate = f"{stem}{extension}"
+    duplicate_index = 2
+    while candidate.casefold() in used_names:
+        candidate = f"{stem}_{duplicate_index:02d}{extension}"
+        duplicate_index += 1
+    used_names.add(candidate.casefold())
+    return candidate
+
+
 def export_prepared_slices(
     source_path: Path,
     slice_result: SliceParseResult,
@@ -135,6 +170,7 @@ def export_prepared_slices(
 ) -> ExportResult:
     """Export normalized slices using one global output-width mapping."""
 
+    _raise_if_cancelled(cancel_check)
     if composite.image is None:
         raise ExportPreflightError(
             composite.error or "No embedded composite is available for export."
@@ -204,6 +240,7 @@ def export_prepared_slices(
     validation_text_path: Path | None = None
     cancelled = False
     total = len(slices)
+    used_output_names: set[str] = set()
     resized_composite: Image.Image | None = None
     render_image: Image.Image | None
     resize_strategy: ResizeStrategy
@@ -211,6 +248,13 @@ def export_prepared_slices(
         render_image = composite.image
         resize_strategy = "none"
     elif scale_plan.estimated_rgba_bytes <= options.max_full_resize_bytes:
+        _emit(
+            progress_callback,
+            phase="resizing",
+            current=0,
+            total=total,
+        )
+        _raise_if_cancelled(cancel_check)
         try:
             resized_composite = resize_full_composite(
                 composite.image,
@@ -220,6 +264,9 @@ def export_prepared_slices(
             raise ExportPreflightError(
                 f"Unable to resize the complete composite: {error}"
             ) from error
+        if _is_cancelled(cancel_check):
+            resized_composite.close()
+            raise ExportCancelledError("Export was cancelled after resizing.")
         render_image = resized_composite
         resize_strategy = "full_canvas"
     else:
@@ -251,13 +298,16 @@ def export_prepared_slices(
             start=1,
         ):
             slice_info = mapped_slice.slice_info
-            if cancel_check is not None and cancel_check():
+            if _is_cancelled(cancel_check):
                 cancelled = True
                 break
 
-            output_path = output_directory / (
-                f"slice_{position:02d}_{mapped_slice.width}x"
-                f"{mapped_slice.height}{encoding_plan.extension}"
+            output_path = output_directory / _output_filename(
+                mapped_slice,
+                position=position,
+                extension=encoding_plan.extension,
+                naming_rule=options.naming_rule,
+                used_names=used_output_names,
             )
             temporary_path = output_path.with_name(f".{output_path.name}.part")
             _emit(
@@ -344,6 +394,12 @@ def export_prepared_slices(
         if resized_composite is not None:
             resized_composite.close()
 
+    _emit(
+        progress_callback,
+        phase="validating",
+        current=len(exported),
+        total=total,
+    )
     post_export_report = validate_export_outputs(
         scale_plan.mapped_slices,
         exported,
@@ -360,6 +416,13 @@ def export_prepared_slices(
         expected_icc_profile=encoding_plan.output_icc_profile,
         check_icc_profile=True,
         expected_alpha=encoding_plan.expected_alpha,
+        cancel_check=cancel_check,
+        progress_callback=lambda current, validation_total: _emit(
+            progress_callback,
+            phase="validating",
+            current=current,
+            total=validation_total,
+        ),
     )
     validation_report = preflight_report.merged(post_export_report)
     if options.write_validation_reports:
@@ -383,6 +446,9 @@ def export_prepared_slices(
     else:
         status = "completed"
 
+    if status == "completed" and _is_cancelled(cancel_check):
+        status = "cancelled"
+
     if options.create_zip and status == "completed":
         _emit(
             progress_callback,
@@ -391,13 +457,13 @@ def export_prepared_slices(
             total=total,
         )
         try:
-            archive_path = Path(
-                shutil.make_archive(
-                    str(output_directory),
-                    "zip",
-                    root_dir=output_directory,
-                )
+            archive_path, archive_cancelled = _create_zip_archive(
+                output_directory,
+                cancel_check=cancel_check,
+                progress_callback=progress_callback,
             )
+            if archive_cancelled:
+                status = "cancelled"
         except Exception as error:
             failures.append(
                 ExportFailure(
@@ -466,90 +532,21 @@ def export_slices(
     """Open a PSD/PSB and export slices at original or target width."""
 
     effective_options = options or ExportOptions()
-    source = Path(source_path)
-    if not source.is_file():
-        raise ExportPreflightError(f"Source file does not exist: {source}")
-    try:
-        psd = PSDImage.open(source)
-        slice_result = parse_document_slices(psd)
-        composite = read_embedded_composite(psd)
-    except ExportServiceError:
-        raise
-    except Exception as error:
-        raise ExportPreflightError(
-            f"Unable to prepare '{source.name}' for export: {error}"
-        ) from error
-    finally:
-        if "psd" in locals():
-            del psd
-
-    use_photoshop = (
-        effective_options.photoshop_fallback == "always"
-        or (
-            effective_options.photoshop_fallback == "if_needed"
-            and not composite.is_reliable
-        )
-    )
-    if use_photoshop:
-        if effective_options.photoshop_fallback == "always":
-            fallback_reason = (
-                "Photoshop rendering was explicitly requested."
-            )
-        else:
-            fallback_reason = (
-                composite.error
-                or composite.warning
-                or "The embedded composite could not be verified."
-            )
-        source_color_mode = composite.color_mode
-        source_depth = composite.depth
-        source_icc_profile = composite.icc_profile
-        expected_has_alpha = composite.has_alpha
-        if composite.image is not None:
-            composite.image.close()
-        try:
-            composite = read_photoshop_composite(
-                source,
-                expected_width=composite.width,
-                expected_height=composite.height,
-                source_color_mode=source_color_mode,
-                source_depth=source_depth,
-                source_icc_profile=source_icc_profile,
-                expected_has_alpha=expected_has_alpha,
-                options=PhotoshopCompositeOptions(
-                    allow_launch=(
-                        effective_options.photoshop_allow_launch
-                    ),
-                    png_compression=(
-                        effective_options.png_compress_level
-                    ),
-                ),
-                automation=photoshop_automation,
-            )
-            composite.warning = (
-                "Photoshop high-fidelity fallback was used. Reason: "
-                f"{fallback_reason}"
-            )
-        except PhotoshopBridgeError as error:
-            raise ExportPreflightError(
-                f"Photoshop high-fidelity fallback failed: {error}"
-            ) from error
-
-    if composite.image is None:
-        raise ExportPreflightError(
-            composite.error or "No embedded composite is available for export."
-        )
-    try:
+    with prepare_document(
+        source_path,
+        effective_options,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+        photoshop_automation=photoshop_automation,
+    ) as prepared:
         return export_prepared_slices(
-            source,
-            slice_result,
-            composite,
+            prepared.source_path,
+            prepared.slice_result,
+            prepared.composite,
             effective_options,
             progress_callback=progress_callback,
             cancel_check=cancel_check,
         )
-    finally:
-        composite.image.close()
 
 
 def export_original_size(
