@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from app.models.scale_plan import ResizeStrategy
 from app.models.slice_info import SliceInfo, SliceIssue
 
 
@@ -20,13 +21,23 @@ class ExportOptions:
     allow_unverified_composite: bool = False
     selected_slice_indices: frozenset[int] | None = None
     png_compress_level: int = 6
-    folder_label: str = "slices_original"
+    folder_label: str | None = None
+    target_width: int | None = None
+    allow_upscale: bool = True
+    max_full_resize_bytes: int = 512 * 1024 * 1024
+    resize_edge_padding: int = 8
 
     def __post_init__(self) -> None:
         if not 0 <= self.png_compress_level <= 9:
             raise ValueError("PNG compression level must be between 0 and 9.")
-        if not self.folder_label.strip():
+        if self.folder_label is not None and not self.folder_label.strip():
             raise ValueError("Output folder label cannot be empty.")
+        if self.target_width is not None and self.target_width <= 0:
+            raise ValueError("Target width must be a positive integer.")
+        if self.max_full_resize_bytes <= 0:
+            raise ValueError("Full-resize memory limit must be positive.")
+        if self.resize_edge_padding < 0:
+            raise ValueError("Resize edge padding cannot be negative.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +79,9 @@ class ExportResult:
     composite_warning: str | None
     source_unchanged: bool
     elapsed_seconds: float
+    target_width: int
+    scale: float
+    resize_strategy: ResizeStrategy
 
     @property
     def success(self) -> bool:

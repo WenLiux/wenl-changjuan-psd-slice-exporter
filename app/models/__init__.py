@@ -9,6 +9,7 @@ from .export_result import (
     ExportResult,
     ExportStatus,
 )
+from .scale_plan import MappedSlice, ResizeStrategy, ScalePlan
 from .slice_info import SliceInfo, SliceIssue, SliceParseResult
 
 __all__ = [
@@ -20,6 +21,9 @@ __all__ = [
     "ExportProgress",
     "ExportResult",
     "ExportStatus",
+    "MappedSlice",
+    "ResizeStrategy",
+    "ScalePlan",
     "SliceInfo",
     "SliceIssue",
     "SliceParseResult",

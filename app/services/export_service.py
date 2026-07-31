@@ -3,12 +3,19 @@ from __future__ import annotations
 import shutil
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image
 from psd_tools import PSDImage
 
 from app.core.composite_reader import read_embedded_composite
+from app.core.resizer import (
+    ResizePlanError,
+    build_scale_plan,
+    resize_full_composite,
+    resize_mapped_slice,
+)
 from app.core.slice_parser import parse_document_slices
 from app.models.composite_result import CompositeResult
 from app.models.export_result import (
@@ -20,6 +27,7 @@ from app.models.export_result import (
     ExportStatus,
     ProgressPhase,
 )
+from app.models.scale_plan import ResizeStrategy
 from app.models.slice_info import SliceInfo, SliceParseResult
 from app.utils.paths import create_collision_safe_directory
 
@@ -89,7 +97,7 @@ def _verify_png(path: Path, expected_size: tuple[int, int]) -> tuple[str, int]:
     return mode, path.stat().st_size
 
 
-def export_prepared_original_size(
+def export_prepared_slices(
     source_path: Path,
     slice_result: SliceParseResult,
     composite: CompositeResult,
@@ -98,7 +106,7 @@ def export_prepared_original_size(
     progress_callback: ProgressCallback | None = None,
     cancel_check: CancelCheck | None = None,
 ) -> ExportResult:
-    """Export normalized slices from an already decoded merged image."""
+    """Export normalized slices using one global output-width mapping."""
 
     if composite.image is None:
         raise ExportPreflightError(
@@ -124,13 +132,26 @@ def export_prepared_original_size(
     if not slices:
         raise ExportPreflightError("There are no exportable slices selected.")
 
+    try:
+        scale_plan = build_scale_plan(
+            canvas_width=composite.width,
+            canvas_height=composite.height,
+            slices=slices,
+            target_width=options.target_width,
+            allow_upscale=options.allow_upscale,
+        )
+    except ResizePlanError as error:
+        raise ExportPreflightError(str(error)) from error
+
     source_path = Path(source_path)
     output_parent = options.output_parent or source_path.parent
-    output_directory = create_collision_safe_directory(
-        output_parent,
-        f"{source_path.stem}_{options.folder_label}",
-        reserve_zip_path=options.create_zip,
-    )
+    folder_label = options.folder_label
+    if folder_label is None:
+        folder_label = (
+            "slices_original"
+            if options.target_width is None
+            else f"slices_{scale_plan.output_width}px"
+        )
     source_signature_before = _source_signature(source_path)
     started = time.perf_counter()
     exported: list[ExportedSlice] = []
@@ -138,6 +159,39 @@ def export_prepared_original_size(
     archive_path: Path | None = None
     cancelled = False
     total = len(slices)
+    resized_composite: Image.Image | None = None
+    render_image: Image.Image | None
+    resize_strategy: ResizeStrategy
+    if scale_plan.is_original_size:
+        render_image = composite.image
+        resize_strategy = "none"
+    elif scale_plan.estimated_rgba_bytes <= options.max_full_resize_bytes:
+        try:
+            resized_composite = resize_full_composite(
+                composite.image,
+                scale_plan,
+            )
+        except Exception as error:
+            raise ExportPreflightError(
+                f"Unable to resize the complete composite: {error}"
+            ) from error
+        render_image = resized_composite
+        resize_strategy = "full_canvas"
+    else:
+        render_image = None
+        resize_strategy = "per_slice"
+    try:
+        output_directory = create_collision_safe_directory(
+            output_parent,
+            f"{source_path.stem}_{folder_label}",
+            reserve_zip_path=options.create_zip,
+        )
+    except Exception as error:
+        if resized_composite is not None:
+            resized_composite.close()
+        raise ExportPreflightError(
+            f"Unable to create the output directory: {error}"
+        ) from error
 
     _emit(
         progress_callback,
@@ -146,75 +200,93 @@ def export_prepared_original_size(
         total=total,
     )
 
-    for position, slice_info in enumerate(slices, start=1):
-        if cancel_check is not None and cancel_check():
-            cancelled = True
-            break
+    try:
+        for position, mapped_slice in enumerate(
+            scale_plan.mapped_slices,
+            start=1,
+        ):
+            slice_info = mapped_slice.slice_info
+            if cancel_check is not None and cancel_check():
+                cancelled = True
+                break
 
-        output_path = output_directory / (
-            f"slice_{position:02d}_{slice_info.width}x"
-            f"{slice_info.height}.png"
-        )
-        temporary_path = output_path.with_name(f".{output_path.name}.part")
-        _emit(
-            progress_callback,
-            phase="exporting",
-            current=position,
-            total=total,
-            slice_info=slice_info,
-            output_path=output_path,
-        )
-
-        crop: Image.Image | None = None
-        try:
-            crop = composite.image.crop(slice_info.bounds)
-            save_options: dict[str, object] = {
-                "format": "PNG",
-                "compress_level": options.png_compress_level,
-            }
-            if composite.icc_profile:
-                save_options["icc_profile"] = composite.icc_profile
-            crop.save(temporary_path, **save_options)
-            temporary_path.replace(output_path)
-            mode, file_size = _verify_png(
-                output_path,
-                (slice_info.width, slice_info.height),
+            output_path = output_directory / (
+                f"slice_{position:02d}_{mapped_slice.width}x"
+                f"{mapped_slice.height}.png"
             )
-            exported.append(
-                ExportedSlice(
-                    slice_info=slice_info,
-                    output_path=output_path,
-                    width=slice_info.width,
-                    height=slice_info.height,
-                    mode=mode,
-                    file_size=file_size,
-                )
-            )
+            temporary_path = output_path.with_name(f".{output_path.name}.part")
             _emit(
                 progress_callback,
-                phase="written",
+                phase="exporting",
                 current=position,
                 total=total,
                 slice_info=slice_info,
                 output_path=output_path,
             )
-        except Exception as error:
-            if temporary_path.exists():
-                temporary_path.unlink()
-            failures.append(
-                ExportFailure(
-                    message=(
-                        f"Slice {slice_info.index} could not be exported: "
-                        f"{error}"
-                    ),
+
+            crop: Image.Image | None = None
+            try:
+                if resize_strategy == "per_slice":
+                    crop = resize_mapped_slice(
+                        composite.image,
+                        mapped_slice,
+                        scale_plan,
+                        edge_padding=options.resize_edge_padding,
+                    )
+                else:
+                    if render_image is None:
+                        raise RuntimeError("Resize image is unavailable.")
+                    crop = render_image.crop(mapped_slice.bounds)
+                save_options: dict[str, object] = {
+                    "format": "PNG",
+                    "compress_level": options.png_compress_level,
+                }
+                if composite.icc_profile:
+                    save_options["icc_profile"] = composite.icc_profile
+                crop.save(temporary_path, **save_options)
+                temporary_path.replace(output_path)
+                mode, file_size = _verify_png(
+                    output_path,
+                    (mapped_slice.width, mapped_slice.height),
+                )
+                exported.append(
+                    ExportedSlice(
+                        slice_info=slice_info,
+                        output_path=output_path,
+                        width=mapped_slice.width,
+                        height=mapped_slice.height,
+                        mode=mode,
+                        file_size=file_size,
+                    )
+                )
+                _emit(
+                    progress_callback,
+                    phase="written",
+                    current=position,
+                    total=total,
                     slice_info=slice_info,
                     output_path=output_path,
-                    exception_type=type(error).__name__,
                 )
-            )
-        finally:
-            if crop is not None:
-                crop.close()
+            except Exception as error:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                failures.append(
+                    ExportFailure(
+                        message=(
+                            f"Slice {slice_info.index} could not be exported: "
+                            f"{error}"
+                        ),
+                        slice_info=slice_info,
+                        output_path=output_path,
+                        exception_type=type(error).__name__,
+                    )
+                )
+            finally:
+                if crop is not None:
+                    crop.close()
+    finally:
+        if resized_composite is not None:
+            resized_composite.close()
 
     status: ExportStatus
     if cancelled:
@@ -263,17 +335,41 @@ def export_prepared_original_size(
         composite_warning=composite.warning,
         source_unchanged=source_unchanged,
         elapsed_seconds=time.perf_counter() - started,
+        target_width=scale_plan.output_width,
+        scale=scale_plan.scale,
+        resize_strategy=resize_strategy,
     )
 
 
-def export_original_size(
+def export_prepared_original_size(
+    source_path: Path,
+    slice_result: SliceParseResult,
+    composite: CompositeResult,
+    options: ExportOptions,
+    *,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
+) -> ExportResult:
+    """Compatibility wrapper that always exports original dimensions."""
+
+    return export_prepared_slices(
+        source_path,
+        slice_result,
+        composite,
+        replace(options, target_width=None),
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
+
+
+def export_slices(
     source_path: str | Path,
     options: ExportOptions | None = None,
     *,
     progress_callback: ProgressCallback | None = None,
     cancel_check: CancelCheck | None = None,
 ) -> ExportResult:
-    """Open a PSD/PSB and export its user slices at original dimensions."""
+    """Open a PSD/PSB and export slices at original or target width."""
 
     source = Path(source_path)
     if not source.is_file():
@@ -297,7 +393,7 @@ def export_original_size(
             composite.error or "No embedded composite is available for export."
         )
     try:
-        return export_prepared_original_size(
+        return export_prepared_slices(
             source,
             slice_result,
             composite,
@@ -307,3 +403,24 @@ def export_original_size(
         )
     finally:
         composite.image.close()
+
+
+def export_original_size(
+    source_path: str | Path,
+    options: ExportOptions | None = None,
+    *,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
+) -> ExportResult:
+    """Compatibility wrapper that always exports original dimensions."""
+
+    original_options = replace(
+        options or ExportOptions(),
+        target_width=None,
+    )
+    return export_slices(
+        source_path,
+        original_options,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )

@@ -16,6 +16,8 @@ from app.services.export_service import (
     ExportPreflightError,
     export_original_size,
     export_prepared_original_size,
+    export_prepared_slices,
+    export_slices,
 )
 
 
@@ -252,3 +254,84 @@ def test_no_exportable_slices_is_a_preflight_error(tmp_path: Path) -> None:
             ExportOptions(output_parent=tmp_path),
         )
     composite.image.close()
+
+
+def test_prepared_target_width_export_reports_scale_and_strategy(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "target.psd"
+    slices, composite = prepared_document(source)
+
+    result = export_prepared_slices(
+        source,
+        slices,
+        composite,
+        ExportOptions(output_parent=tmp_path, target_width=5),
+    )
+
+    assert result.success
+    assert result.target_width == 5
+    assert result.scale == 0.5
+    assert result.resize_strategy == "full_canvas"
+    assert result.output_directory.name == "target_slices_5px"
+    assert [(item.width, item.height) for item in result.exported_slices] == [
+        (5, 5),
+        (5, 5),
+    ]
+    composite.image.close()
+
+
+def test_low_memory_strategy_matches_full_resize_for_solid_fixture(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "memory.psd"
+    full_slices, full_composite = prepared_document(source)
+    full = export_prepared_slices(
+        source,
+        full_slices,
+        full_composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            target_width=7,
+            max_full_resize_bytes=1024 * 1024,
+        ),
+    )
+
+    low_slices, low_composite = prepared_document(source)
+    low = export_prepared_slices(
+        source,
+        low_slices,
+        low_composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            target_width=7,
+            max_full_resize_bytes=1,
+        ),
+    )
+
+    assert full.resize_strategy == "full_canvas"
+    assert low.resize_strategy == "per_slice"
+    assert [
+        image_pixel_sha256(item.output_path) for item in full.exported_slices
+    ] == [
+        image_pixel_sha256(item.output_path) for item in low.exported_slices
+    ]
+    full_composite.image.close()
+    low_composite.image.close()
+
+
+def test_real_psd_exports_full_width_slices_at_750px(tmp_path: Path) -> None:
+    source = fixture_path("psd_v8")
+
+    result = export_slices(
+        source,
+        ExportOptions(output_parent=tmp_path, target_width=750),
+    )
+
+    assert result.success
+    assert result.target_width == 750
+    assert result.resize_strategy == "full_canvas"
+    assert all(item.width == 750 for item in result.exported_slices)
+    assert sum(item.height for item in result.exported_slices) == round(
+        28164 * 750 / 1440
+    )
