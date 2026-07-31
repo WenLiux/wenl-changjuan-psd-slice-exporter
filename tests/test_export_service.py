@@ -1,0 +1,254 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import zipfile
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+from app.models.composite_result import CompositeResult
+from app.models.export_result import ExportOptions, ExportProgress
+from app.models.slice_info import SliceInfo, SliceParseResult
+from app.services.export_service import (
+    ExportPreflightError,
+    export_original_size,
+    export_prepared_original_size,
+)
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = json.loads(
+    (PROJECT_ROOT / "tests" / "fixtures" / "baseline_manifest.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def fixture_path(sample_name: str) -> Path:
+    sample = MANIFEST[sample_name]
+    environment_variable = sample["environment_variable"]
+    value = os.environ.get(environment_variable)
+    if not value:
+        pytest.skip(f"{environment_variable} is not set")
+    path = Path(value)
+    if not path.is_file():
+        pytest.fail(f"{environment_variable} does not point to a file: {path}")
+    return path
+
+
+def image_pixel_sha256(path: Path) -> str:
+    with Image.open(path) as image:
+        image.load()
+        digest = hashlib.sha256()
+        digest.update(image.mode.encode("ascii"))
+        digest.update(f"{image.width}x{image.height}".encode("ascii"))
+        digest.update(image.tobytes())
+        return digest.hexdigest()
+
+
+def prepared_document(
+    source_path: Path,
+    *,
+    reliable: bool = True,
+) -> tuple[SliceParseResult, CompositeResult]:
+    source_path.write_bytes(b"fixture")
+    slices = (
+        SliceInfo(
+            index=0,
+            slice_id=1,
+            name="top",
+            left=0,
+            top=0,
+            right=10,
+            bottom=10,
+            is_automatic=False,
+            source_version="V8",
+            origin="userGenerated",
+        ),
+        SliceInfo(
+            index=1,
+            slice_id=2,
+            name="bottom",
+            left=0,
+            top=10,
+            right=10,
+            bottom=20,
+            is_automatic=False,
+            source_version="V8",
+            origin="userGenerated",
+        ),
+    )
+    slice_result = SliceParseResult(
+        source_version="V8",
+        all_slices=slices,
+        exportable_slices=slices,
+        excluded_slices=(),
+        issues=(),
+    )
+    composite = CompositeResult(
+        image=Image.new("RGBA", (10, 20), (10, 20, 30, 128)),
+        source=(
+            "embedded_merged"
+            if reliable
+            else "embedded_merged_unverified"
+        ),
+        width=10,
+        height=20,
+        color_mode="RGB",
+        depth=8,
+        pil_mode="RGBA",
+        icc_profile=None,
+        has_alpha=True,
+        is_reliable=reliable,
+        warning=None if reliable else "Unverified composite.",
+    )
+    return slice_result, composite
+
+
+@pytest.mark.parametrize("sample_name", ["psd_v8", "psb_v6"])
+def test_real_fixture_original_export_matches_baseline(
+    sample_name: str, tmp_path: Path
+) -> None:
+    source = fixture_path(sample_name)
+    sample = MANIFEST[sample_name]
+    source_stat = source.stat()
+
+    result = export_original_size(
+        source,
+        ExportOptions(output_parent=tmp_path),
+    )
+
+    assert result.success
+    assert result.status == "completed"
+    assert result.archive_path is None
+    assert result.source_unchanged
+    assert source.stat().st_size == source_stat.st_size
+    assert source.stat().st_mtime_ns == source_stat.st_mtime_ns
+    assert [item.output_path.name for item in result.exported_slices] == [
+        record[0] for record in sample["outputs"]
+    ]
+    assert len(result.exported_slices) == 14
+
+    for output_index in (0, len(sample["outputs"]) - 1):
+        expected = sample["outputs"][output_index]
+        output = result.exported_slices[output_index]
+        assert [output.width, output.height, output.mode] == expected[1:4]
+        assert image_pixel_sha256(output.output_path) == expected[4]
+
+
+def test_output_directories_are_collision_safe_and_zip_is_opt_in(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "sample.psd"
+    first_slices, first_composite = prepared_document(source)
+    first = export_prepared_original_size(
+        source,
+        first_slices,
+        first_composite,
+        ExportOptions(output_parent=tmp_path),
+    )
+
+    second_slices, second_composite = prepared_document(source)
+    second = export_prepared_original_size(
+        source,
+        second_slices,
+        second_composite,
+        ExportOptions(output_parent=tmp_path, create_zip=True),
+    )
+
+    assert first.output_directory.name == "sample_slices_original"
+    assert first.archive_path is None
+    assert second.output_directory.name == "sample_slices_original_02"
+    assert second.archive_path is not None
+    assert second.archive_path.is_file()
+    with zipfile.ZipFile(second.archive_path) as archive:
+        assert archive.testzip() is None
+        assert sorted(archive.namelist()) == [
+            "slice_01_10x10.png",
+            "slice_02_10x10.png",
+        ]
+
+    first_composite.image.close()
+    second_composite.image.close()
+
+
+def test_cancellation_is_checked_between_slices(tmp_path: Path) -> None:
+    source = tmp_path / "cancel.psd"
+    slices, composite = prepared_document(source)
+    checks = 0
+    progress: list[ExportProgress] = []
+
+    def cancel_check() -> bool:
+        nonlocal checks
+        checks += 1
+        return checks > 1
+
+    result = export_prepared_original_size(
+        source,
+        slices,
+        composite,
+        ExportOptions(output_parent=tmp_path),
+        progress_callback=progress.append,
+        cancel_check=cancel_check,
+    )
+
+    assert result.status == "cancelled"
+    assert len(result.exported_slices) == 1
+    assert [item.phase for item in progress] == [
+        "starting",
+        "exporting",
+        "written",
+    ]
+    assert not result.archive_path
+    composite.image.close()
+
+
+def test_unverified_composite_requires_explicit_permission(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "unverified.psd"
+    slices, composite = prepared_document(source, reliable=False)
+
+    with pytest.raises(ExportPreflightError, match="Unverified composite"):
+        export_prepared_original_size(
+            source,
+            slices,
+            composite,
+            ExportOptions(output_parent=tmp_path),
+        )
+
+    allowed = export_prepared_original_size(
+        source,
+        slices,
+        composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            allow_unverified_composite=True,
+        ),
+    )
+    assert allowed.success
+    composite.image.close()
+
+
+def test_no_exportable_slices_is_a_preflight_error(tmp_path: Path) -> None:
+    source = tmp_path / "empty.psd"
+    slices, composite = prepared_document(source)
+    empty_result = SliceParseResult(
+        source_version="V8",
+        all_slices=(),
+        exportable_slices=(),
+        excluded_slices=(),
+        issues=(),
+    )
+
+    with pytest.raises(ExportPreflightError, match="no exportable slices"):
+        export_prepared_original_size(
+            source,
+            empty_result,
+            composite,
+            ExportOptions(output_parent=tmp_path),
+        )
+    composite.image.close()

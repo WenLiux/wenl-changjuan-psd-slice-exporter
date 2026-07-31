@@ -10,15 +10,17 @@ Completed:
 - Stage 0: legacy audit and pixel-level regression baseline.
 - Stage 1: typed slice model and V6/V7/V8 parser extraction.
 - Stage 2: reliable embedded-composite reader.
+- Stage 3: collision-safe original-size folder export.
 
-Stage 3, original-size folder export, is the next planned stage. The desktop
-UI has not started.
+Stage 4, target-width scaling, is the next planned stage. The desktop UI has
+not started.
 
 Reports:
 
 - `docs/stage-0-audit.md`
 - `docs/stage-1-report.md`
 - `docs/stage-2-report.md`
+- `docs/stage-3-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -48,8 +50,18 @@ python -m pytest
 
 See `tests/fixtures/README.md` for the pinned fixture fingerprints.
 
+## Original-size service CLI
+
+```powershell
+python scripts/export_original_size.py input.psd
+python scripts/export_original_size.py input.psb --output-parent D:\Exports --zip
+```
+
+ZIP output is disabled unless `--zip` is provided. Every run creates a new,
+collision-safe output directory.
+
 ## Current test result
 
 ```text
-23 passed
+29 passed
 ```
