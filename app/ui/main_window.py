@@ -26,6 +26,7 @@ from app.services.document_service import (
     prepare_document,
 )
 from app.services.settings_store import SettingsStore
+from app.config.brand import WINDOW_TITLE
 from app.ui.app_state import (
     FormValidationError,
     UiMode,
@@ -147,7 +148,7 @@ class MainWindow(ctk.CTk):
         task_runner: TaskRunner | None = None,
     ) -> None:
         super().__init__()
-        self.title("PSD / PSB 高保真切片导出器")
+        self.title(WINDOW_TITLE)
         self.geometry("1240x820")
         self.minsize(1100, 720)
         self.configure(fg_color=THEME.bg_window)

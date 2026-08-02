@@ -10,8 +10,10 @@ from app.services.settings_store import (
     SETTINGS_DIRECTORY_NAME,
     SETTINGS_FILE_NAME,
     SETTINGS_SCHEMA_VERSION,
+    SETTINGS_VENDOR_NAME,
     SettingsStore,
     default_settings_path,
+    legacy_settings_path,
 )
 
 
@@ -23,9 +25,40 @@ def test_default_path_uses_appdata_without_creating_it(
     result = default_settings_path({"APPDATA": str(appdata)})
 
     assert result == (
-        appdata / SETTINGS_DIRECTORY_NAME / SETTINGS_FILE_NAME
+        appdata
+        / SETTINGS_VENDOR_NAME
+        / SETTINGS_DIRECTORY_NAME
+        / SETTINGS_FILE_NAME
     )
     assert not appdata.exists()
+
+
+def test_legacy_settings_are_copied_to_branded_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    appdata = tmp_path / "Roaming"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    legacy_path = legacy_settings_path()
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text(
+        json.dumps(
+            {
+                "schema_version": SETTINGS_SCHEMA_VERSION,
+                "settings": {"target_width": 2160, "width_mode": "custom"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = SettingsStore().load_with_diagnostics()
+
+    assert result.settings.target_width == 2160
+    assert result.settings.width_mode == "custom"
+    assert result.migrated_from == legacy_path
+    assert result.path == default_settings_path()
+    assert result.path.is_file()
+    assert legacy_path.is_file()
 
 
 def test_round_trip_writes_versioned_json(tmp_path: Path) -> None:

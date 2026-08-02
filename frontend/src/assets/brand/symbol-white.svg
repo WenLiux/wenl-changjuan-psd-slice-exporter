@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 236 159"
+     width="236"
+     height="159"
+     role="img"
+     aria-label="Wenl logo">
+  <path fill="#F4F5F7"
+        d="M0 0
+           L68 36
+           L68 0
+           L136 36
+           L136 0
+           L236 52
+           L236 158
+           L203 158
+           L168 139
+           L168 159
+           L68 159
+           L0 122
+           Z"/>
+</svg>

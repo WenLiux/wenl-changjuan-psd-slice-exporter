@@ -6,6 +6,11 @@ from pathlib import Path
 
 from app import __version__
 from app.bridge.api import AppApi
+from app.config.brand import (
+    APP_DIRECTORY,
+    APP_VENDOR_DIRECTORY,
+    WINDOW_TITLE,
+)
 
 
 def frontend_directory() -> Path:
@@ -30,7 +35,7 @@ def run_webview(*, debug: bool = False) -> int:
 
     api = AppApi()
     window = webview.create_window(
-        f"PSD / PSB 高保真切片导出器 · v{__version__}",
+        f"{WINDOW_TITLE} · v{__version__}",
         url=index_path.as_uri(),
         js_api=api,
         width=1240,
@@ -65,8 +70,11 @@ def run_webview(*, debug: bool = False) -> int:
 
     window.events.loaded += install_drop_handler
     window.events.closed += api.close
-    storage_path = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / (
-        "PSD Slice Exporter" / Path("WebView2")
+    storage_path = (
+        Path(os.getenv("LOCALAPPDATA", str(Path.home())))
+        / APP_VENDOR_DIRECTORY
+        / APP_DIRECTORY
+        / "WebView2"
     )
     storage_path.mkdir(parents=True, exist_ok=True)
     webview.start(

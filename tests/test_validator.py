@@ -102,9 +102,14 @@ def test_validation_report_writes_json_and_text(tmp_path: Path) -> None:
     json_path, text_path = report.write(tmp_path)
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert json_path.name == "WENL长卷_导出验证报告.json"
+    assert text_path.name == "WENL长卷_导出验证报告.txt"
+    assert payload["brand"] == "WENL / 长卷"
     assert payload["passed"] is True
     assert payload["warning_count"] == 1
-    assert "Example warning." in text_path.read_text(encoding="utf-8")
+    report_text = text_path.read_text(encoding="utf-8")
+    assert "WENL / 长卷" in report_text
+    assert "Example warning." in report_text
 
 
 def test_grayscale_output_is_validated_without_band_unpack_error(

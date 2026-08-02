@@ -8,10 +8,17 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, TypeVar
 
 from app.models.app_settings import AppSettings
+from app.config.brand import (
+    APP_DIRECTORY,
+    APP_VENDOR_DIRECTORY,
+    LEGACY_APP_DIRECTORY,
+)
 
 
 SETTINGS_SCHEMA_VERSION = 1
-SETTINGS_DIRECTORY_NAME = "PSD Slice Exporter"
+SETTINGS_VENDOR_NAME = APP_VENDOR_DIRECTORY
+SETTINGS_DIRECTORY_NAME = APP_DIRECTORY
+LEGACY_SETTINGS_DIRECTORY_NAME = LEGACY_APP_DIRECTORY
 SETTINGS_FILE_NAME = "settings.json"
 
 _T = TypeVar("_T")
@@ -25,6 +32,7 @@ class SettingsLoadResult:
     path: Path
     used_defaults: bool
     warnings: tuple[str, ...] = ()
+    migrated_from: Path | None = None
 
 
 def default_settings_path(
@@ -38,7 +46,26 @@ def default_settings_path(
         appdata = Path(appdata_value)
     else:
         appdata = Path.home() / "AppData" / "Roaming"
-    return appdata / SETTINGS_DIRECTORY_NAME / SETTINGS_FILE_NAME
+    return (
+        appdata
+        / SETTINGS_VENDOR_NAME
+        / SETTINGS_DIRECTORY_NAME
+        / SETTINGS_FILE_NAME
+    )
+
+
+def legacy_settings_path(
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Return the read-only compatibility path used before WENL branding."""
+
+    environment = os.environ if environ is None else environ
+    appdata_value = environment.get("APPDATA", "").strip()
+    if appdata_value:
+        appdata = Path(appdata_value)
+    else:
+        appdata = Path.home() / "AppData" / "Roaming"
+    return appdata / LEGACY_SETTINGS_DIRECTORY_NAME / SETTINGS_FILE_NAME
 
 
 class SettingsStore:
@@ -51,14 +78,24 @@ class SettingsStore:
         defaults: AppSettings | None = None,
     ) -> None:
         self.path = path if path is not None else default_settings_path()
+        self._legacy_path = legacy_settings_path() if path is None else None
         self.defaults = defaults if defaults is not None else AppSettings()
 
     def load(self) -> AppSettings:
         return self.load_with_diagnostics().settings
 
     def load_with_diagnostics(self) -> SettingsLoadResult:
+        read_path = self.path
+        migrated_from: Path | None = None
+        if (
+            not read_path.exists()
+            and self._legacy_path is not None
+            and self._legacy_path.is_file()
+        ):
+            read_path = self._legacy_path
+            migrated_from = read_path
         try:
-            serialized = self.path.read_text(encoding="utf-8-sig")
+            serialized = read_path.read_text(encoding="utf-8-sig")
         except FileNotFoundError:
             return SettingsLoadResult(
                 settings=self.defaults,
@@ -115,11 +152,20 @@ class SettingsStore:
             )
 
         settings, warnings = _decode_settings(values, self.defaults)
+        if migrated_from is not None:
+            try:
+                self.save(settings)
+            except OSError as error:
+                warnings = (
+                    *warnings,
+                    f"旧版设置已读取，但无法迁移到新目录：{error}",
+                )
         return SettingsLoadResult(
             settings=settings,
             path=self.path,
             used_defaults=bool(warnings),
             warnings=warnings,
+            migrated_from=migrated_from,
         )
 
     def save(self, settings: AppSettings) -> Path:

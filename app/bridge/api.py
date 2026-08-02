@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from app import __version__
+from app.config.brand import BRAND_NAME, FULL_PRODUCT_NAME, FUNCTIONAL_SLOGAN
 from app.bridge.schemas import (
     document_payload,
     export_result_payload,
@@ -62,7 +63,7 @@ class AppApi:
         self._lock = threading.RLock()
         self._closed = threading.Event()
         self._cache_directory = Path(
-            tempfile.mkdtemp(prefix="psd-slice-exporter-")
+            tempfile.mkdtemp(prefix="wenl-changjuan-")
         )
         self._runner = TaskRunner(
             load_handler=prepare_document,
@@ -92,6 +93,11 @@ class AppApi:
             lambda: ok(
                 {
                     "version": __version__,
+                    "brand": {
+                        "name": BRAND_NAME,
+                        "full_product_name": FULL_PRODUCT_NAME,
+                        "functional_slogan": FUNCTIONAL_SLOGAN,
+                    },
                     "settings": settings_payload(self._settings),
                     "settings_warnings": list(self._settings_warnings),
                     "platform": "Windows" if os.name == "nt" else os.name,

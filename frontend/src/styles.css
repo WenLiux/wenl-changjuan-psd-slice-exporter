@@ -103,14 +103,22 @@ button { color: inherit; }
   padding: 1px;
 }
 
-.file-drop { display: flex; align-items: center; gap: 18px; padding: 16px 22px; overflow: hidden; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.file-drop { display: flex; align-items: center; gap: 18px; padding: 12px 18px; overflow: hidden; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
 .file-drop.is-dragging { border-color: rgba(119, 148, 255, .72); background-color: rgba(40, 56, 96, .9); transform: translateY(1px); }
-.file-icon { display: grid; place-items: center; flex: 0 0 50px; height: 50px; border: 1px solid rgba(132, 160, 255, .25); border-radius: 15px; color: #b6c3ff; background: linear-gradient(150deg, rgba(95, 125, 255, .25), rgba(35, 49, 84, .28)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 10px 24px rgba(29,43,91,.22); }
+.brand-lockup { display: flex; align-items: center; flex: 0 0 248px; height: 54px; }
+.brand-logo { display: block; width: 105px; height: 52px; object-fit: contain; }
+.brand-divider { width: 1px; height: 30px; margin: 0 13px; background: linear-gradient(transparent, rgba(173, 189, 227, .28), transparent); }
+.brand-product { display: flex; flex-direction: column; gap: 4px; white-space: nowrap; }
+.brand-product strong { color: #e7ebf5; font-size: 12px; font-weight: 620; letter-spacing: .2px; }
+.brand-product small { color: var(--text-muted); font-size: 9.5px; letter-spacing: .25px; }
 .file-copy { min-width: 0; flex: 1; }
-.file-copy h1 { margin: 0 0 6px; font-size: 18px; font-weight: 650; letter-spacing: .1px; }
+.file-copy h1 { margin: 0 0 6px; font-size: 16px; font-weight: 620; letter-spacing: .1px; }
 .file-copy p { max-width: 760px; margin: 0; overflow: hidden; color: var(--text-secondary); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
 .file-actions { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.file-actions small { color: var(--text-muted); font-size: 10.5px; }
+.file-actions small { max-width: 184px; overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.file-action-buttons { display: flex; align-items: center; gap: 7px; }
+.button-about { min-width: 58px; padding: 0 11px; border-color: var(--border-soft); color: #aeb9cf; background: rgba(15, 24, 41, .68); }
+.button-about:hover { border-color: var(--border-bright); color: #edf1fb; background: rgba(29, 41, 66, .86); }
 
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; font-size: 12.5px; font-weight: 580; transition: transform .14s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, opacity .16s ease; }
 .button:hover:not(:disabled) { transform: translateY(-1px); }
@@ -262,10 +270,33 @@ input:disabled, select:disabled { color: #667187; opacity: .58; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes control-enable { from { opacity: .58; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
 
+.dialog-backdrop { position: fixed; z-index: 40; display: grid; place-items: center; inset: 0; padding: 24px; background: rgba(2, 5, 11, .72); backdrop-filter: blur(12px) saturate(115%); animation: backdrop-in .2s ease both; }
+.about-dialog { position: relative; width: min(440px, calc(100vw - 48px)); padding: 38px 42px 34px; border: 1px solid rgba(155, 177, 228, .25); border-radius: 24px; overflow: hidden; text-align: center; background: linear-gradient(145deg, rgba(25, 35, 58, .96), rgba(10, 17, 31, .98)); box-shadow: 0 34px 85px rgba(0, 0, 0, .54), inset 0 1px 0 rgba(255,255,255,.06); animation: dialog-in .24s cubic-bezier(.22,.85,.3,1) both; }
+.about-dialog::before { content: ""; position: absolute; width: 310px; height: 150px; left: 65px; top: -105px; border-radius: 50%; background: rgba(89, 115, 213, .25); filter: blur(48px); pointer-events: none; }
+.dialog-close { position: absolute; z-index: 2; display: grid; place-items: center; width: 31px; height: 31px; top: 13px; right: 13px; padding: 0; border: 1px solid transparent; border-radius: 9px; color: var(--text-muted); background: transparent; cursor: pointer; transition: color .16s ease, border-color .16s ease, background .16s ease; }
+.dialog-close:hover { border-color: var(--border-soft); color: #e9edf7; background: rgba(255,255,255,.05); }
+.about-logo { position: relative; display: block; width: 190px; height: 93px; margin: 0 auto 8px; object-fit: contain; }
+.about-slogan { margin: 4px 0 19px !important; color: #c4cde2 !important; font-size: 13px !important; letter-spacing: 2px; }
+.about-rule { width: 100%; height: 1px; margin-bottom: 20px; background: linear-gradient(90deg, transparent, rgba(152, 173, 222, .24), transparent); }
+.about-dialog h2 { margin: 0 0 10px; font-size: 16px; font-weight: 620; }
+.about-dialog p { margin: 0 0 11px; color: var(--text-secondary); font-size: 12px; }
+.about-local { display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #8ed6be !important; }
+.about-dialog > small { display: block; margin-top: 4px; color: var(--text-muted); font-size: 10px; }
+
+.brand-splash { position: fixed; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 43%, rgba(59, 81, 158, .23), transparent 28%), #070b14; animation: splash-life .78s ease both; }
+.brand-splash-mark { display: grid; place-items: center; width: 68px; height: 68px; margin-bottom: 14px; border: 1px solid rgba(145, 167, 225, .2); border-radius: 19px; background: linear-gradient(145deg, rgba(73, 96, 190, .32), rgba(20, 31, 54, .55)); box-shadow: 0 18px 40px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08); }
+.brand-splash-mark img { width: 38px; height: 38px; object-fit: contain; }
+.brand-splash-logo { width: 142px; height: 69px; object-fit: contain; }
+.brand-splash p { margin: 5px 0 0; color: #94a1ba; font-size: 11px; letter-spacing: 2px; }
+@keyframes backdrop-in { from { opacity: 0; } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(9px) scale(.985); } }
+@keyframes splash-life { 0% { opacity: 0; } 16%, 72% { opacity: 1; } 100% { opacity: 0; } }
+
 @media (max-height: 760px) {
   .app-shell { grid-template-rows: 76px minmax(0, 1fr) 78px; gap: 9px; padding: 11px 14px; }
   .file-drop { padding: 12px 18px; }
-  .file-icon { flex-basis: 44px; height: 44px; }
+  .brand-lockup { flex-basis: 235px; }
+  .brand-logo { width: 96px; height: 47px; }
   .document-panel { grid-template-rows: auto 150px auto 34px minmax(0, 1fr); padding: 16px; }
   .preview-frame { min-height: 122px; }
   .preview-frame img { max-height: 138px; }

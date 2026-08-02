@@ -176,10 +176,10 @@ def test_output_directories_are_collision_safe_and_zip_is_opt_in(
     with zipfile.ZipFile(second.archive_path) as archive:
         assert archive.testzip() is None
         assert sorted(archive.namelist()) == [
+            "WENL长卷_导出验证报告.json",
+            "WENL长卷_导出验证报告.txt",
             "slice_01_10x10.png",
             "slice_02_10x10.png",
-            "validation_report.json",
-            "validation_report.txt",
         ]
 
     first_composite.image.close()

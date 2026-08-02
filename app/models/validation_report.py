@@ -5,6 +5,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
+from app.config.brand import (
+    BRAND_NAME,
+    FULL_PRODUCT_NAME,
+    FUNCTIONAL_SLOGAN,
+    VERSION,
+)
+
 
 ValidationSeverity = Literal["info", "warning", "error"]
 ValidationPhase = Literal["preflight", "post_export"]
@@ -41,6 +48,9 @@ class ValidationReport:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "product": FULL_PRODUCT_NAME,
+            "brand": BRAND_NAME,
+            "version": VERSION,
             "passed": self.passed,
             "warning_count": self.warning_count,
             "error_count": self.error_count,
@@ -49,9 +59,13 @@ class ValidationReport:
 
     def to_text(self) -> str:
         lines = [
-            f"Validation: {'PASS' if self.passed else 'FAIL'}",
-            f"Warnings: {self.warning_count}",
-            f"Errors: {self.error_count}",
+            BRAND_NAME,
+            "高保真切片导出验证报告",
+            "=" * 32,
+            f"版本：{VERSION}",
+            f"验证结果：{'通过' if self.passed else '未通过'}",
+            f"警告：{self.warning_count}",
+            f"错误：{self.error_count}",
         ]
         for item in self.findings:
             slices = (
@@ -68,11 +82,12 @@ class ValidationReport:
                 f"[{item.severity.upper()}] {item.phase}/{item.code}: "
                 f"{item.message}{slices}{coordinates}"
             )
+        lines.extend(["", FUNCTIONAL_SLOGAN])
         return "\n".join(lines) + "\n"
 
     def write(self, output_directory: Path) -> tuple[Path, Path]:
-        json_path = output_directory / "validation_report.json"
-        text_path = output_directory / "validation_report.txt"
+        json_path = output_directory / "WENL长卷_导出验证报告.json"
+        text_path = output_directory / "WENL长卷_导出验证报告.txt"
         json_path.write_text(
             json.dumps(self.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",

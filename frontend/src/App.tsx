@@ -6,15 +6,18 @@ import {
   FileText,
   FolderOpen,
   Image as ImageIcon,
+  Info,
   LoaderCircle,
   Play,
   ShieldCheck,
   Sparkles,
   Square,
-  Upload,
   X,
 } from 'lucide-react'
 import { bridge, demoDocument } from './services/bridge'
+import logoWhite from './assets/brand/logo-white.svg'
+import symbolWhite from './assets/brand/symbol-white.svg'
+import { BRAND } from './config/brand'
 import type {
   ApiResponse,
   AppEvent,
@@ -86,7 +89,23 @@ function App() {
   const [taskId, setTaskId] = useState<number | null>(null)
   const [toast, setToast] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
   const initialized = useRef(false)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setShowSplash(false), 780)
+    return () => window.clearTimeout(timeout)
+  }, [])
+
+  useEffect(() => {
+    if (!aboutOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAboutOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [aboutOpen])
 
   useEffect(() => {
     const cards = Array.from(
@@ -148,7 +167,7 @@ function App() {
       setToast({
         tone: event.result.success ? 'success' : 'error',
         text: event.result.success
-          ? `已导出 ${event.result.exported_count} 张切片`
+          ? `${event.result.exported_count} 张切片已成功导出`
           : '导出完成，但验证发现问题。',
       })
       window.setTimeout(() => setToast(null), 4000)
@@ -273,12 +292,12 @@ function App() {
 
   const status = useMemo(() => {
     if (progress) return phaseText[progress.phase] ?? progress.phase
-    if (mode === 'loading_document') return '正在加载文档'
+    if (mode === 'loading_document') return '正在展开长卷'
     if (mode === 'cancelling') return '正在安全取消'
-    if (result?.success) return `导出完成 · ${result.exported_count} 张切片`
+    if (result?.success) return `${result.exported_count} 张切片已成功导出 · 源文件保持不变`
     if (mode === 'export_cancelled') return '任务已取消'
-    if (document) return `已就绪 · ${selectedCount} / ${document.slice_count} 张切片`
-    return '等待导入 PSD / PSB 文件'
+    if (document) return `长卷已展开 · ${selectedCount} / ${document.slice_count} 张切片待导出`
+    return '等待展开长卷'
   }, [document, mode, progress, result, selectedCount])
 
   return (
@@ -288,12 +307,14 @@ function App() {
       <div className="noise" />
 
       <FileDropHeader
+        version={version}
         path={document?.source_path ?? ''}
         busy={busy}
         dragging={dragging}
         onChoose={chooseFile}
         onDragState={setDragging}
         onDrop={(path) => { setDragging(false); loadPath(path) }}
+        onAbout={() => setAboutOpen(true)}
       />
 
       <section className="workspace">
@@ -339,24 +360,40 @@ function App() {
           <button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button>
         </div>
       )}
+
+      {aboutOpen && (
+        <AboutDialog version={version} onClose={() => setAboutOpen(false)} />
+      )}
+
+      {showSplash && (
+        <div className="brand-splash" aria-hidden="true">
+          <div className="brand-splash-mark"><img src={symbolWhite} alt="" /></div>
+          <img className="brand-splash-logo" src={logoWhite} alt="" />
+          <p>{BRAND.functionalSlogan}</p>
+        </div>
+      )}
     </main>
   )
 }
 
 function FileDropHeader({
+  version,
   path,
   busy,
   dragging,
   onChoose,
   onDragState,
   onDrop,
+  onAbout,
 }: {
+  version: string
   path: string
   busy: boolean
   dragging: boolean
   onChoose: () => void
   onDragState: (value: boolean) => void
   onDrop: (path: string) => void
+  onAbout: () => void
 }) {
   return (
     <header
@@ -373,16 +410,28 @@ function FileDropHeader({
         else onDragState(false)
       }}
     >
-      <div className="file-icon"><Upload size={25} strokeWidth={1.8} /></div>
+      <div className="brand-lockup">
+        <img className="brand-logo" src={logoWhite} alt="WENL / 长卷" />
+        <span className="brand-divider" />
+        <div className="brand-product">
+          <strong>高保真切片导出</strong>
+          <small>PSD / PSB · v{version}</small>
+        </div>
+      </div>
       <div className="file-copy">
-        <h1>{dragging ? '松开即可读取文件' : '拖入 PSD / PSB，或选择文件'}</h1>
-        <p title={path}>{path || '支持单个 PSD / PSB 文件，原文件不会被修改'}</p>
+        <h1>{dragging ? '松开即可展开长卷' : '将 PSD 或 PSB 拖入这里'}</h1>
+        <p title={path}>{path || BRAND.functionalSlogan}</p>
       </div>
       <div className="file-actions">
-        <button className="button button-primary" disabled={busy} onClick={onChoose}>
-          <Sparkles size={16} />选择文件
-        </button>
-        <small>PSD / PSB · 本地处理</small>
+        <div className="file-action-buttons">
+          <button className="button button-about" aria-label="关于 WENL 长卷" title="关于 WENL / 长卷" onClick={onAbout}>
+            <Info size={15} />关于
+          </button>
+          <button className="button button-primary" disabled={busy} onClick={onChoose}>
+            <Sparkles size={16} />选择文件
+          </button>
+        </div>
+        <small>{BRAND.localOnly}</small>
       </div>
     </header>
   )
@@ -417,8 +466,8 @@ function DocumentPanel({
       {!document ? (
         <div className="empty-state">
           {loading ? <LoaderCircle className="spin" size={34} /> : <ImageIcon size={34} />}
-          <h3>{loading ? '正在读取文档结构' : '还没有导入文件'}</h3>
-          <p>{loading ? '大尺寸 PSB 会在后台解析，界面可以继续响应。' : '从上方选择或拖入一个 PSD / PSB 文件开始。'}</p>
+          <h3>{loading ? '正在展开长卷' : '将 PSD 或 PSB 拖入这里'}</h3>
+          <p>{loading ? '正在读取文档、预览和切片信息；超大 PSB 可能需要稍候。' : `${BRAND.functionalSlogan} ${BRAND.localOnly}`}</p>
         </div>
       ) : (
         <>
@@ -586,7 +635,7 @@ function TaskFooter({
     <footer className="glass-card interactive-glow task-footer">
       <div className="task-status">
         <div className="task-title"><span className={`status-dot ${busy ? 'pulse' : ''}`} />{status}</div>
-        <p>{progress?.slice ? `切片 ${progress.current}/${progress.total} · ${progress.slice.name}` : result ? `${result.output_directory} · ${result.elapsed_seconds.toFixed(1)} 秒` : `v${version} · 高保真合成图 · 原文件只读`}</p>
+        <p>{progress?.slice ? `切片 ${progress.current}/${progress.total} · ${progress.slice.name}` : result ? `${result.output_directory} · ${result.elapsed_seconds.toFixed(1)} 秒` : `${BRAND.name} · v${version} · 本地处理 · 原文件只读`}</p>
         <div className={`progress-track ${busy && !progress?.total ? 'indeterminate' : ''}`}><i style={{ width: `${progressPercent}%` }} /></div>
       </div>
       <div className="footer-actions">
@@ -599,6 +648,25 @@ function TaskFooter({
         )}
       </div>
     </footer>
+  )
+}
+
+function AboutDialog({ version, onClose }: { version: string; onClose: () => void }) {
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose()
+    }}>
+      <section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-title">
+        <button className="dialog-close" aria-label="关闭关于窗口" onClick={onClose}><X size={17} /></button>
+        <img className="about-logo" src={logoWhite} alt="WENL / 长卷" />
+        <p className="about-slogan">{BRAND.slogan}</p>
+        <div className="about-rule" />
+        <h2 id="about-title">{BRAND.productName}</h2>
+        <p>{BRAND.functionalSlogan}</p>
+        <p className="about-local"><ShieldCheck size={15} />{BRAND.localOnly}</p>
+        <small>版本 {version}</small>
+      </section>
+    </div>
   )
 }
 

@@ -1,7 +1,9 @@
-# PSD/PSB High-Fidelity Slice Exporter
+# WENL / 长卷｜PSD / PSB 高保真切片导出工具
 
-Windows desktop tool project for exporting Photoshop slices without the legacy
-8192-pixel long-edge downscaling behavior.
+超长画布，原样切出。Windows 本地桌面工具，用于导出 Photoshop
+切片并绕过旧流程的 8192 像素长边缩小限制。文件仅在本机处理，原文件只读。
+
+当前深色客户端固定使用明确着色的浅色品牌标识；黑色 Logo 不会用于深色背景。
 
 ## Current status
 
@@ -22,7 +24,7 @@ Completed:
 - Version 0.3.0: pywebview/WebView2 desktop shell with a React, TypeScript,
   and CSS-variable interface; typed JSON bridge and background task events.
 
-Version 0.3.0 is the default desktop interface. The 0.2.0 CustomTkinter UI is
+Version 0.3.0 is the default WENL / 长卷 desktop interface. The 0.2.0 CustomTkinter UI is
 temporarily available through `--legacy-ui` for migration rollback.
 
 Reports:
@@ -187,6 +189,14 @@ Settings are stored at:
 ```text
 %APPDATA%\PSD Slice Exporter\settings.json
 ```
+
+WENL / 长卷品牌版首次启动后使用：
+
+```text
+%APPDATA%\WENL\Changjuan\settings.json
+```
+
+如果新目录还没有设置文件，应用会读取并复制旧目录中的设置；旧文件不会被删除。
 
 Photoshop launch, unverified-composite use, and mode conversion are one-run
 safety permissions and are never saved.
