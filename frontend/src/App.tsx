@@ -313,6 +313,7 @@ function App() {
         />
         <SettingsPanel
           settings={settings}
+          sourceWidth={document?.width ?? null}
           disabled={busy}
           onChange={setSettings}
           onChooseOutput={chooseOutput}
@@ -476,11 +477,13 @@ function DocumentPanel({
 
 function SettingsPanel({
   settings,
+  sourceWidth,
   disabled,
   onChange,
   onChooseOutput,
 }: {
   settings: AppSettings
+  sourceWidth: number | null
   disabled: boolean
   onChange: (value: AppSettings) => void
   onChooseOutput: () => void
@@ -489,6 +492,11 @@ function SettingsPanel({
     onChange({ ...settings, [key]: value })
   }
   const jpeg = settings.output_format === 'jpeg'
+  const displayedTargetWidth = (
+    settings.width_mode === 'original' && sourceWidth
+      ? sourceWidth
+      : settings.target_width
+  )
   return (
     <aside className="glass-card interactive-glow settings-panel">
       <div className="panel-heading compact">
@@ -505,13 +513,14 @@ function SettingsPanel({
         />
         <div className="inline-field">
           <label htmlFor="target-width">目标宽度</label>
-          <div className={`input-with-unit ${settings.width_mode === 'custom' ? 'is-enabled' : ''}`}>
+          <div className={`input-with-unit ${settings.width_mode === 'custom' ? 'is-enabled' : 'is-source-width'}`}>
             <input
               id="target-width"
               type="number"
               min={1}
-              value={settings.target_width}
+              value={displayedTargetWidth}
               disabled={settings.width_mode === 'original'}
+              title={settings.width_mode === 'original' ? `文档原始宽度：${displayedTargetWidth}px` : '自定义输出宽度'}
               onChange={(event) => update('target_width', Math.max(1, Number(event.target.value)))}
             /><span>px</span>
           </div>

@@ -200,6 +200,8 @@ input:disabled, select:disabled { color: #667187; opacity: .58; }
 .input-with-unit { border-radius: 10px; transition: filter .22s ease, transform .22s ease; }
 .input-with-unit.is-enabled { filter: drop-shadow(0 5px 12px rgba(54, 76, 160, .09)); }
 .input-with-unit.is-enabled input { animation: control-enable .24s ease; }
+.input-with-unit.is-source-width input { color: #aeb9cf; opacity: .82; }
+.input-with-unit.is-source-width span { color: #7f8da7; }
 .toggle-row { display: flex; align-items: center; gap: 9px; margin: 5px -6px -4px; padding: 4px 6px; border-radius: 9px; cursor: pointer; color: var(--text-secondary); font-size: 10.5px; transition: color .18s ease, background .18s ease; }
 .toggle-row:hover { color: #d2daea; background: rgba(117, 139, 190, .055); }
 .toggle-row > span { display: flex; align-items: baseline; gap: 6px; }
