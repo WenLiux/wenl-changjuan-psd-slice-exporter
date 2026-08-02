@@ -8,9 +8,24 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $resolvedPython = (Resolve-Path $PythonPath).Path
 $specPath = Join-Path $projectRoot "packaging\psd_slice_exporter.spec"
+$frontendPath = Join-Path $projectRoot "frontend"
 
 Push-Location $projectRoot
 try {
+    Push-Location $frontendPath
+    try {
+        & npm.cmd install
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm install failed with exit code $LASTEXITCODE."
+        }
+        & npm.cmd run build
+        if ($LASTEXITCODE -ne 0) {
+            throw "Frontend build failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
     & $resolvedPython -m PyInstaller `
         --clean `
         --noconfirm `

@@ -23,6 +23,19 @@ for package_name in ("customtkinter", "tkinterdnd2"):
     binaries += package_binaries
     hiddenimports += package_hiddenimports
 
+webview_datas, webview_binaries, webview_hiddenimports = collect_all(
+    "webview"
+)
+datas += webview_datas
+binaries += webview_binaries
+hiddenimports += webview_hiddenimports
+datas.append(
+    (
+        str(project_root / "frontend" / "dist"),
+        "frontend",
+    )
+)
+
 analysis = Analysis(
     [str(project_root / "app" / "main.py")],
     pathex=[str(project_root)],

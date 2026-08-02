@@ -1,10 +1,14 @@
-PSD / PSB 高保真切片导出器 0.2.0
+PSD / PSB 高保真切片导出器 0.3.0
 =================================
 
 启动
 ----
 
 双击 PSD-PSB-Slice-Exporter.exe。
+
+0.3.0 使用 WebView2 渲染新的网页式桌面界面。Windows 10 / 11 通常已
+包含 WebView2 Runtime；若启动时提示缺失，请安装 Microsoft Edge
+WebView2 Runtime 后重试。
 
 请保持整个文件夹完整，不要只把 EXE 单独移走；_internal 文件夹是程序
 运行所需的组件。

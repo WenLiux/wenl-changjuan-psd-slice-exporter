@@ -18,11 +18,12 @@ Completed:
 - Stage 8: responsive Windows desktop UI and reusable worker session.
 - Stage 9: reproducible Windows onedir packaging and packaged-app verification.
 - Stage 10: final release acceptance and Windows artifact handoff.
-- Version 0.2.0: restrained blue-glass UI redesign with reusable visual
-  components and responsive verification.
+- Version 0.2.0: restrained blue-glass CustomTkinter UI redesign.
+- Version 0.3.0: pywebview/WebView2 desktop shell with a React, TypeScript,
+  and CSS-variable interface; typed JSON bridge and background task events.
 
-Version 0.2.0 is complete. Version 0.1.0 remains documented as the original
-functional release baseline.
+Version 0.3.0 is the default desktop interface. The 0.2.0 CustomTkinter UI is
+temporarily available through `--legacy-ui` for migration rollback.
 
 Reports:
 
@@ -134,6 +135,23 @@ Install the normal UI dependencies:
 
 ```powershell
 python -m pip install -r requirements.txt
+```
+
+Build the React interface and launch the WebView2 desktop client:
+
+```powershell
+cd frontend
+npm.cmd install
+npm.cmd run build
+cd ..
+python -m app.main
+```
+
+The UI is loaded from packaged local assets and does not require a development
+server or internet connection. To compare against the previous desktop UI:
+
+```powershell
+python -m app.main --legacy-ui
 ```
 
 Install the optional Photoshop bridge when fallback is required:
