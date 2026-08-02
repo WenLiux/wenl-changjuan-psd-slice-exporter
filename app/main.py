@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from app.ui.main_window import MainWindow
 
-    ctk.set_appearance_mode("system")
+    ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     app = MainWindow()
     app.mainloop()

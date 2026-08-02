@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-项目已完成 0.1.0 版本开发、Windows 打包和最终验收，可直接用于：
+项目已完成 0.2.0 版本开发、Windows 打包和最终验收，可直接用于：
 
 - 读取 PSD/PSB 内嵌切片；
 - 按原始宽度或指定宽度（例如 1440、750）导出；
@@ -16,7 +16,7 @@
 当前支持的用户成品为：
 
 ```text
-release\PSD-PSB-Slice-Exporter-Windows-x64-v0.1.0.zip
+release\PSD-PSB-Slice-Exporter-Windows-x64-v0.2.0.zip
 ```
 
 解压后必须保持 `PSD-PSB-Slice-Exporter.exe` 与 `_internal` 文件夹在一起。
@@ -36,13 +36,13 @@ release\PSD-PSB-Slice-Exporter-Windows-x64-v0.1.0.zip
 | 8 | Windows 桌面 UI、后台任务和缓存 | 完成 |
 | 9 | PyInstaller Windows 打包和成品验证 | 完成 |
 | 10 | 最终验收和交付 | 完成 |
+| 0.2.0 | 深蓝玻璃视觉重构和新版打包验收 | 完成 |
 
 各阶段的详细报告位于 `docs`。
 
 ## 已验证结果
 
-- 测试共收集 137 项。
-- 带两个真实样本运行时：136 项通过，1 项按设计跳过。
+- 测试共收集 140 项，两个真实样本和真实 GUI 全部启用时 140 项通过。
 - 最终打包程序分别成功处理 PSD 和 PSB，各导出 14 个切片。
 - 从交付 ZIP 解压后的程序已再次按 1440px 导出并验证成功。
 - 最终 GUI 能正常启动、响应并关闭。
@@ -55,11 +55,12 @@ release\PSD-PSB-Slice-Exporter-Windows-x64-v0.1.0.zip
 ```text
 docs\stage-9-report.md
 docs\stage-10-acceptance.md
+docs\ui-redesign-report.md
 ```
 
 ## 回家后直接运行成品
 
-1. 解压 `PSD-PSB-Slice-Exporter-Windows-x64-v0.1.0.zip`。
+1. 解压 `PSD-PSB-Slice-Exporter-Windows-x64-v0.2.0.zip`。
 2. 打开解压后的 `PSD-PSB-Slice-Exporter` 文件夹。
 3. 双击 `PSD-PSB-Slice-Exporter.exe`。
 4. 将 PSD/PSB 拖进窗口，或点击“选择文件”。
@@ -148,7 +149,7 @@ dist\PSD-PSB-Slice-Exporter
 
 ## 当前已知限制
 
-- 0.1.0 Windows 成品尚未进行数字签名，首次运行可能出现 SmartScreen
+- 0.2.0 Windows 成品尚未进行数字签名，首次运行可能出现 SmartScreen
   提示。
 - 当前正式交付形式是 onedir 文件夹 ZIP，不能只复制 EXE。
 - Photoshop 高保真回退 V1 主要面向 8-bit RGB 文档。
@@ -175,7 +176,7 @@ dist\PSD-PSB-Slice-Exporter
 ```text
 请先阅读 README.md、docs/HANDOFF-CN.md、
 docs/stage-9-report.md 和 docs/stage-10-acceptance.md。
-这是 PSD/PSB 高保真切片导出器 0.1.0，阶段 0-10 已完成。
+这是 PSD/PSB 高保真切片导出器 0.2.0，阶段 0-10 和视觉重构已完成。
 不要修改或覆盖 samples 中的原始 PSD/PSB；涉及真实样本时先后核对
 SHA-256。先运行测试并查看 git status，再继续我接下来提出的功能。
 ```

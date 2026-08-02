@@ -18,8 +18,11 @@ Completed:
 - Stage 8: responsive Windows desktop UI and reusable worker session.
 - Stage 9: reproducible Windows onedir packaging and packaged-app verification.
 - Stage 10: final release acceptance and Windows artifact handoff.
+- Version 0.2.0: restrained blue-glass UI redesign with reusable visual
+  components and responsive verification.
 
-Version 0.1.0 is complete.
+Version 0.2.0 is complete. Version 0.1.0 remains documented as the original
+functional release baseline.
 
 Reports:
 
@@ -34,6 +37,7 @@ Reports:
 - `docs/stage-8-report.md`
 - `docs/stage-9-report.md`
 - `docs/stage-10-acceptance.md`
+- `docs/ui-redesign-report.md`
 - `docs/stage-1-checklist.md`
 
 ## Legacy exporter
@@ -155,6 +159,11 @@ slice selection, PNG/JPEG and color controls, safe Photoshop fallback,
 collision-safe output, ZIP creation, progress, cancellation, validation
 reports, and repeat export without reparsing the open PSD/PSB.
 
+Version 0.2.0 adds a centralized dark blue-glass theme, static ambient and card
+gradients, restrained highlights, rounded preview and list surfaces, consistent
+primary/secondary/danger controls, and line icons. The effects redraw only
+after a resize settles; there is no continuous animation loop.
+
 Settings are stored at:
 
 ```text
@@ -194,10 +203,10 @@ folder structure.
 ## Current test result
 
 ```text
-137 tests collected
-136 passed, 1 opt-in GUI test skipped
+140 passed
 ```
 
-The final packaged application was additionally exercised against both pinned
-PSD/PSB fixtures, launched as a real Windows GUI, and run again after extracting
-the distributable ZIP. See `docs/stage-9-report.md` for the release matrix.
+This includes both pinned PSD/PSB fixtures and the real Windows GUI export. The
+0.2.0 packaged application was additionally tested against both fixtures,
+launched as a responding GUI, and run after extracting its distributable ZIP.
+See `docs/ui-redesign-report.md` for the release matrix.

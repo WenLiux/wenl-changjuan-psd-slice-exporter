@@ -10,7 +10,7 @@ from tkinter import colorchooser, filedialog, messagebox
 from typing import Any
 
 import customtkinter as ctk
-from PIL import Image
+from PIL import Image, ImageDraw
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
 from app.models.app_settings import AppSettings
@@ -34,6 +34,19 @@ from app.ui.app_state import (
     estimate_slice_outputs,
     parse_hex_rgb,
 )
+from app.ui.components import (
+    GlassCard,
+    make_button,
+    make_checkbox,
+    make_entry,
+    make_ambient_background,
+    make_icon,
+    make_option_menu,
+    make_segmented,
+    make_switch,
+    section_label,
+    ui_font,
+)
 from app.ui.task_runner import (
     Cancelled,
     Failed,
@@ -43,6 +56,7 @@ from app.ui.task_runner import (
     TaskEvent,
     TaskRunner,
 )
+from app.ui.theme import THEME
 
 
 _PHASE_TEXT = {
@@ -135,7 +149,28 @@ class MainWindow(ctk.CTk):
         super().__init__()
         self.title("PSD / PSB 高保真切片导出器")
         self.geometry("1240x820")
-        self.minsize(1080, 720)
+        self.minsize(1100, 720)
+        self.configure(fg_color=THEME.bg_window)
+        self._background_pil = make_ambient_background()
+        self._background_image = ctk.CTkImage(
+            light_image=self._background_pil,
+            dark_image=self._background_pil,
+            size=(1240, 820),
+        )
+        self._background_label = ctk.CTkLabel(
+            self,
+            text="",
+            image=self._background_image,
+            fg_color="transparent",
+        )
+        self._background_label.place(
+            x=0,
+            y=0,
+            relwidth=1,
+            relheight=1,
+        )
+        self._background_label.lower()
+        self.bind("<Configure>", self._resize_background, add="+")
 
         self._settings_store = settings_store or SettingsStore()
         settings_result = self._settings_store.load_with_diagnostics()
@@ -156,9 +191,24 @@ class MainWindow(ctk.CTk):
         self._preview_image: ctk.CTkImage | None = None
         self._preview_pil: Image.Image | None = None
         self._slice_rows: dict[int, tuple[tk.BooleanVar, ctk.CTkLabel]] = {}
+        self._slice_row_frames: dict[int, ctk.CTkFrame] = {}
+        self._icons = {
+            "upload": make_icon("upload", size=25),
+            "sparkle": make_icon("sparkle", size=16),
+            "folder": make_icon("folder", size=18),
+            "report": make_icon("report", size=17),
+            "close": make_icon(
+                "close",
+                size=17,
+                color=THEME.danger_text,
+            ),
+        }
 
         self._create_variables(self._settings)
         self._build_layout()
+        self.after_idle(
+            lambda: self._scroll_frame_to_top(self.settings_panel)
+        )
         self._configure_drag_and_drop()
         self._bind_variable_updates()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -234,7 +284,13 @@ class MainWindow(ctk.CTk):
         self._build_drop_header()
 
         content = ctk.CTkFrame(self, fg_color="transparent")
-        content.grid(row=1, column=0, padx=18, pady=(0, 10), sticky="nsew")
+        content.grid(
+            row=1,
+            column=0,
+            padx=20,
+            pady=(0, 12),
+            sticky="nsew",
+        )
         content.grid_columnconfigure(0, weight=3, uniform="content")
         content.grid_columnconfigure(1, weight=2, uniform="content")
         content.grid_rowconfigure(0, weight=1)
@@ -244,138 +300,305 @@ class MainWindow(ctk.CTk):
         self._build_footer()
 
     def _build_drop_header(self) -> None:
-        self.drop_frame = ctk.CTkFrame(
+        self.drop_frame = GlassCard(
             self,
-            height=88,
-            corner_radius=14,
-            border_width=1,
+            emphasized=True,
+            height=106,
         )
         self.drop_frame.grid(
             row=0,
             column=0,
-            padx=18,
-            pady=18,
+            padx=20,
+            pady=(18, 12),
             sticky="ew",
         )
         self.drop_frame.grid_columnconfigure(0, weight=1)
+        self.drop_frame.grid_rowconfigure(0, weight=1)
         self.drop_frame.grid_propagate(False)
 
-        ctk.CTkLabel(
+        self.drop_surface = GlassCard(
             self.drop_frame,
+            secondary=True,
+            textured=False,
+            corner_radius=15,
+            border_color=THEME.border_subtle,
+        )
+        self.drop_surface.grid(
+            row=0,
+            column=0,
+            padx=7,
+            pady=7,
+            sticky="nsew",
+        )
+        self.drop_surface.grid_columnconfigure(1, weight=1)
+
+        icon_shell = ctk.CTkFrame(
+            self.drop_surface,
+            width=62,
+            height=62,
+            corner_radius=16,
+            fg_color=THEME.accent_soft,
+            border_width=1,
+            border_color=THEME.border_highlight,
+        )
+        icon_shell.grid(row=0, column=0, rowspan=2, padx=(18, 16), pady=20)
+        icon_shell.grid_propagate(False)
+        icon_shell.grid_columnconfigure(0, weight=1)
+        icon_shell.grid_rowconfigure(0, weight=1)
+        ctk.CTkLabel(icon_shell, text="", image=self._icons["upload"]).grid(
+            row=0,
+            column=0,
+        )
+
+        ctk.CTkLabel(
+            self.drop_surface,
             text="拖入 PSD / PSB，或选择文件",
-            font=ctk.CTkFont(size=18, weight="bold"),
-        ).grid(row=0, column=0, padx=18, pady=(13, 0), sticky="w")
+            text_color=THEME.text_primary,
+            font=ui_font(19, weight="bold"),
+        ).grid(row=0, column=1, pady=(22, 0), sticky="sw")
         ctk.CTkLabel(
-            self.drop_frame,
+            self.drop_surface,
             textvariable=self.file_var,
             anchor="w",
-            text_color=("gray35", "gray70"),
-        ).grid(row=1, column=0, padx=18, pady=(1, 12), sticky="ew")
-        self.choose_file_button = ctk.CTkButton(
-            self.drop_frame,
+            text_color=THEME.text_secondary,
+            font=ui_font(12),
+        ).grid(row=1, column=1, pady=(2, 22), sticky="new")
+        self.choose_file_button = make_button(
+            self.drop_surface,
             text="选择文件",
-            width=112,
             command=self._choose_file,
+            kind="primary",
+            width=142,
+            height=44,
+            image=self._icons["sparkle"],
         )
         self.choose_file_button.grid(
             row=0,
-            column=1,
-            rowspan=2,
-            padx=18,
-            pady=18,
+            column=2,
+            padx=(16, 18),
+            pady=(17, 0),
+            sticky="se",
+        )
+        ctk.CTkLabel(
+            self.drop_surface,
+            text="支持 PSD / PSB 格式",
+            text_color=THEME.text_muted,
+            font=ui_font(11),
+        ).grid(
+            row=1,
+            column=2,
+            padx=(16, 18),
+            pady=(3, 16),
+            sticky="ne",
         )
 
     def _build_document_panel(self, parent: ctk.CTkFrame) -> None:
-        panel = ctk.CTkFrame(parent, corner_radius=14)
-        panel.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        panel = GlassCard(parent, emphasized=True)
+        panel.grid(row=0, column=0, padx=(0, 9), sticky="nsew")
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_rowconfigure(3, weight=1)
 
-        ctk.CTkLabel(
+        document_top = GlassCard(
             panel,
+            secondary=True,
+            textured=False,
+            corner_radius=16,
+            border_color=THEME.border_subtle,
+        )
+        document_top.grid(
+            row=0,
+            column=0,
+            padx=20,
+            pady=(18, 10),
+            sticky="ew",
+        )
+        document_top.grid_columnconfigure(0, weight=1)
+        document_top.grid_columnconfigure(1, minsize=246)
+
+        details = ctk.CTkFrame(
+            document_top,
+            fg_color=THEME.bg_card_secondary,
+        )
+        details.grid(row=0, column=0, padx=(14, 0), pady=12, sticky="nw")
+        ctk.CTkLabel(
+            details,
             text="文档与切片",
-            font=ctk.CTkFont(size=17, weight="bold"),
-        ).grid(row=0, column=0, padx=16, pady=(14, 2), sticky="w")
+            text_color=THEME.text_primary,
+            font=ui_font(17, weight="bold"),
+        ).grid(row=0, column=0, pady=(2, 8), sticky="w")
         ctk.CTkLabel(
-            panel,
+            details,
             textvariable=self.document_info_var,
             anchor="w",
-        ).grid(row=1, column=0, padx=16, sticky="ew")
+            justify="left",
+            wraplength=330,
+            text_color=THEME.text_secondary,
+            font=ui_font(13),
+        ).grid(row=1, column=0, pady=(0, 6), sticky="ew")
         ctk.CTkLabel(
-            panel,
+            details,
             textvariable=self.composite_var,
             anchor="w",
-            text_color=("gray35", "gray70"),
-        ).grid(row=2, column=0, padx=16, pady=(0, 8), sticky="ew")
+            justify="left",
+            wraplength=330,
+            text_color=THEME.text_muted,
+            font=ui_font(12),
+        ).grid(row=2, column=0, sticky="ew")
 
-        body = ctk.CTkFrame(panel, fg_color="transparent")
-        body.grid(row=3, column=0, padx=12, pady=(0, 12), sticky="nsew")
-        body.grid_columnconfigure(0, weight=1)
-        body.grid_rowconfigure(2, weight=1)
-
-        preview = ctk.CTkFrame(body, height=205, corner_radius=10)
-        preview.grid(row=0, column=0, sticky="ew")
+        preview_glow = ctk.CTkFrame(
+            document_top,
+            width=236,
+            height=224,
+            corner_radius=18,
+            fg_color=THEME.preview_glow,
+        )
+        preview_glow.grid(
+            row=0,
+            column=1,
+            padx=(12, 12),
+            pady=12,
+            sticky="ne",
+        )
+        preview_glow.grid_propagate(False)
+        preview_glow.grid_columnconfigure(0, weight=1)
+        preview_glow.grid_rowconfigure(0, weight=1)
+        preview = ctk.CTkFrame(
+            preview_glow,
+            corner_radius=16,
+            fg_color=THEME.bg_input,
+            border_width=1,
+            border_color=THEME.border_emphasis,
+        )
+        preview.grid(row=0, column=0, padx=2, pady=2, sticky="nsew")
         preview.grid_columnconfigure(0, weight=1)
         preview.grid_rowconfigure(0, weight=1)
-        preview.grid_propagate(False)
         self.preview_label = ctk.CTkLabel(
             preview,
             text="加载后显示首张切片预览",
+            text_color=THEME.text_muted,
+            font=ui_font(12),
         )
-        self.preview_label.grid(row=0, column=0, padx=10, pady=10)
+        self.preview_label.grid(row=0, column=0, padx=8, pady=8)
 
-        controls = ctk.CTkFrame(body, fg_color="transparent")
-        controls.grid(row=1, column=0, pady=(8, 4), sticky="ew")
+        controls = ctk.CTkFrame(panel, fg_color="transparent")
+        controls.grid(
+            row=1,
+            column=0,
+            padx=20,
+            pady=(0, 8),
+            sticky="ew",
+        )
         controls.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             controls,
             text="导出切片",
-            font=ctk.CTkFont(weight="bold"),
+            text_color=THEME.text_primary,
+            font=ui_font(14, weight="bold"),
         ).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(
+        make_button(
             controls,
             text="全选",
-            width=64,
-            height=26,
             command=lambda: self._set_all_slices(True),
-        ).grid(row=0, column=1, padx=4)
-        ctk.CTkButton(
+            kind="secondary",
+            width=70,
+            height=32,
+        ).grid(row=0, column=1, padx=(6, 4))
+        make_button(
             controls,
             text="全不选",
-            width=72,
-            height=26,
-            fg_color="transparent",
-            border_width=1,
             command=lambda: self._set_all_slices(False),
+            kind="quiet",
+            width=76,
+            height=32,
         ).grid(row=0, column=2)
 
-        self.slice_list = ctk.CTkScrollableFrame(
-            body,
-            corner_radius=10,
-            label_text="序号 / 名称 · 坐标 · 原始尺寸 → 输出尺寸",
-            label_anchor="w",
+        list_header = ctk.CTkFrame(
+            panel,
+            height=40,
+            corner_radius=THEME.radius_small,
+            fg_color=THEME.bg_card_secondary,
+            border_width=1,
+            border_color=THEME.border_subtle,
         )
-        self.slice_list.grid(row=2, column=0, sticky="nsew")
+        list_header.grid(
+            row=2,
+            column=0,
+            padx=20,
+            pady=(0, 8),
+            sticky="ew",
+        )
+        list_header.grid_propagate(False)
+        ctk.CTkLabel(
+            list_header,
+            text="序号 / 名称 · 坐标 · 原始尺寸 → 输出尺寸",
+            anchor="w",
+            text_color=THEME.text_secondary,
+            font=ui_font(12),
+        ).pack(fill="both", padx=14, pady=8)
+
+        self.slice_list = ctk.CTkScrollableFrame(
+            panel,
+            corner_radius=THEME.radius_medium,
+            fg_color=THEME.bg_input,
+            border_width=1,
+            border_color=THEME.border_subtle,
+            scrollbar_button_color=THEME.border_default,
+            scrollbar_button_hover_color=THEME.border_highlight,
+        )
+        self.slice_list.grid(
+            row=3,
+            column=0,
+            padx=20,
+            pady=(0, 18),
+            sticky="nsew",
+        )
         self.slice_list.grid_columnconfigure(0, weight=1)
 
     def _build_settings_panel(self, parent: ctk.CTkFrame) -> None:
-        self.settings_panel = ctk.CTkScrollableFrame(
-            parent,
-            corner_radius=14,
-            label_text="导出设置",
-            label_font=ctk.CTkFont(size=17, weight="bold"),
-            label_anchor="w",
-        )
-        self.settings_panel.grid(
+        self.settings_card = GlassCard(parent)
+        self.settings_card.grid(
             row=0,
             column=1,
-            padx=(8, 0),
+            padx=(9, 0),
+            sticky="nsew",
+        )
+        self.settings_card.grid_columnconfigure(0, weight=1)
+        self.settings_card.grid_rowconfigure(1, weight=1)
+        ctk.CTkLabel(
+            self.settings_card,
+            text="导出设置",
+            anchor="w",
+            text_color=THEME.text_primary,
+            font=ui_font(17, weight="bold"),
+        ).grid(
+            row=0,
+            column=0,
+            padx=20,
+            pady=(18, 8),
+            sticky="ew",
+        )
+
+        self.settings_panel = ctk.CTkScrollableFrame(
+            self.settings_card,
+            corner_radius=14,
+            fg_color=THEME.bg_card,
+            border_width=1,
+            border_color=THEME.border_subtle,
+            scrollbar_fg_color=THEME.bg_card,
+            scrollbar_button_color=THEME.border_default,
+            scrollbar_button_hover_color=THEME.border_highlight,
+        )
+        self.settings_panel.grid(
+            row=1,
+            column=0,
+            padx=(8, 7),
+            pady=(0, 9),
             sticky="nsew",
         )
         self.settings_panel.grid_columnconfigure(0, weight=1)
         row = 0
 
-        self.width_segment = ctk.CTkSegmentedButton(
+        self.width_segment = make_segmented(
             self.settings_panel,
             values=["原始宽度", "指定宽度"],
             variable=self.width_mode_var,
@@ -385,7 +608,7 @@ class MainWindow(ctk.CTk):
             row=row,
             column=0,
             padx=12,
-            pady=(6, 8),
+            pady=(2, 10),
             sticky="ew",
         )
         row += 1
@@ -396,21 +619,31 @@ class MainWindow(ctk.CTk):
         )
         width_row.grid(row=row, column=0, padx=12, sticky="ew")
         width_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(width_row, text="目标宽度").grid(
+        ctk.CTkLabel(
+            width_row,
+            text="目标宽度",
+            text_color=THEME.text_secondary,
+            font=ui_font(13),
+        ).grid(
             row=0, column=0, padx=(0, 8)
         )
-        self.target_width_entry = ctk.CTkEntry(
+        self.target_width_entry = make_entry(
             width_row,
             textvariable=self.target_width_var,
             placeholder_text="1440",
         )
         self.target_width_entry.grid(row=0, column=1, sticky="ew")
-        ctk.CTkLabel(width_row, text="px").grid(
+        ctk.CTkLabel(
+            width_row,
+            text="px",
+            text_color=THEME.text_secondary,
+            font=ui_font(12),
+        ).grid(
             row=0, column=2, padx=(6, 0)
         )
         row += 1
 
-        self.allow_upscale_switch = ctk.CTkSwitch(
+        self.allow_upscale_switch = make_switch(
             self.settings_panel,
             text="允许放大（关闭时只允许缩小或原尺寸）",
             variable=self.allow_upscale_var,
@@ -421,14 +654,15 @@ class MainWindow(ctk.CTk):
         )
         row += 1
 
-        ctk.CTkLabel(
-            self.settings_panel,
-            text="文件格式",
-            anchor="w",
-            font=ctk.CTkFont(weight="bold"),
-        ).grid(row=row, column=0, padx=12, sticky="ew")
+        section_label(self.settings_panel, "文件格式").grid(
+            row=row,
+            column=0,
+            padx=12,
+            pady=(2, 0),
+            sticky="ew",
+        )
         row += 1
-        self.format_segment = ctk.CTkSegmentedButton(
+        self.format_segment = make_segmented(
             self.settings_panel,
             values=["PNG", "JPEG"],
             variable=self.format_var,
@@ -445,29 +679,41 @@ class MainWindow(ctk.CTk):
         )
         jpeg_row.grid(row=row, column=0, padx=12, sticky="ew")
         jpeg_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(jpeg_row, text="JPEG 质量").grid(
+        ctk.CTkLabel(
+            jpeg_row,
+            text="JPEG 质量",
+            text_color=THEME.text_secondary,
+            font=ui_font(13),
+        ).grid(
             row=0, column=0, padx=(0, 8)
         )
-        self.jpeg_quality_entry = ctk.CTkEntry(
+        self.jpeg_quality_entry = make_entry(
             jpeg_row,
             width=70,
             textvariable=self.jpeg_quality_var,
         )
         self.jpeg_quality_entry.grid(row=0, column=1, sticky="w")
-        ctk.CTkLabel(jpeg_row, text="背景").grid(
+        ctk.CTkLabel(
+            jpeg_row,
+            text="背景",
+            text_color=THEME.text_secondary,
+            font=ui_font(13),
+        ).grid(
             row=0, column=2, padx=(12, 6)
         )
-        self.jpeg_background_entry = ctk.CTkEntry(
+        self.jpeg_background_entry = make_entry(
             jpeg_row,
             width=92,
             textvariable=self.jpeg_background_var,
         )
         self.jpeg_background_entry.grid(row=0, column=3)
-        self.color_button = ctk.CTkButton(
+        self.color_button = make_button(
             jpeg_row,
             text="…",
-            width=32,
             command=self._choose_background_color,
+            kind="secondary",
+            width=38,
+            height=38,
         )
         self.color_button.grid(row=0, column=4, padx=(5, 0))
         row += 1
@@ -487,14 +733,15 @@ class MainWindow(ctk.CTk):
         )
         row += 1
 
-        ctk.CTkLabel(
-            self.settings_panel,
-            text="Photoshop 高保真回退",
-            anchor="w",
-            font=ctk.CTkFont(weight="bold"),
-        ).grid(row=row, column=0, padx=12, pady=(14, 0), sticky="ew")
+        section_label(self.settings_panel, "Photoshop 高保真回退").grid(
+            row=row,
+            column=0,
+            padx=12,
+            pady=(16, 0),
+            sticky="ew",
+        )
         row += 1
-        self.photoshop_menu = ctk.CTkOptionMenu(
+        self.photoshop_menu = make_option_menu(
             self.settings_panel,
             values=list(_LABEL_TO_PHOTOSHOP),
             variable=self.photoshop_fallback_var,
@@ -504,7 +751,7 @@ class MainWindow(ctk.CTk):
             row=row, column=0, padx=12, pady=(4, 4), sticky="ew"
         )
         row += 1
-        self.photoshop_launch_check = ctk.CTkCheckBox(
+        self.photoshop_launch_check = make_checkbox(
             self.settings_panel,
             text="本次允许启动 Photoshop（不会保存此授权）",
             variable=self.photoshop_launch_var,
@@ -518,16 +765,18 @@ class MainWindow(ctk.CTk):
             text="使用前请保存并关闭 Photoshop 中所有打开的文档。",
             wraplength=360,
             justify="left",
-            text_color=("#8A5A00", "#E0B55B"),
+            text_color=THEME.warning,
+            font=ui_font(12),
         ).grid(row=row, column=0, padx=12, pady=(0, 8), sticky="w")
         row += 1
 
-        ctk.CTkLabel(
-            self.settings_panel,
-            text="输出目录",
-            anchor="w",
-            font=ctk.CTkFont(weight="bold"),
-        ).grid(row=row, column=0, padx=12, pady=(8, 0), sticky="ew")
+        section_label(self.settings_panel, "输出目录").grid(
+            row=row,
+            column=0,
+            padx=12,
+            pady=(10, 0),
+            sticky="ew",
+        )
         row += 1
         output_row = ctk.CTkFrame(
             self.settings_panel,
@@ -535,47 +784,47 @@ class MainWindow(ctk.CTk):
         )
         output_row.grid(row=row, column=0, padx=12, pady=4, sticky="ew")
         output_row.grid_columnconfigure(0, weight=1)
-        self.output_entry = ctk.CTkEntry(
+        self.output_entry = make_entry(
             output_row,
             textvariable=self.output_directory_var,
             placeholder_text="留空则输出到源文件旁",
         )
         self.output_entry.grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(
+        make_button(
             output_row,
             text="浏览",
-            width=62,
             command=self._choose_output_directory,
+            kind="secondary",
+            width=70,
+            height=38,
         ).grid(row=0, column=1, padx=(6, 0))
         row += 1
 
-        ctk.CTkCheckBox(
+        make_checkbox(
             self.settings_panel,
             text="完成后创建 ZIP",
             variable=self.create_zip_var,
         ).grid(row=row, column=0, padx=12, pady=3, sticky="w")
         row += 1
-        ctk.CTkCheckBox(
+        make_checkbox(
             self.settings_panel,
             text="完成后打开输出目录",
             variable=self.open_output_var,
         ).grid(row=row, column=0, padx=12, pady=3, sticky="w")
         row += 1
 
-        ctk.CTkLabel(
+        section_label(
             self.settings_panel,
-            text="当前文档高级授权（不会保存）",
-            anchor="w",
-            font=ctk.CTkFont(weight="bold"),
-        ).grid(row=row, column=0, padx=12, pady=(14, 2), sticky="ew")
+            "当前文档高级授权（不会保存）",
+        ).grid(row=row, column=0, padx=12, pady=(16, 2), sticky="ew")
         row += 1
-        ctk.CTkCheckBox(
+        make_checkbox(
             self.settings_panel,
             text="允许必要的色彩 / 模式转换",
             variable=self.allow_conversion_var,
         ).grid(row=row, column=0, padx=12, pady=3, sticky="w")
         row += 1
-        ctk.CTkCheckBox(
+        make_checkbox(
             self.settings_panel,
             text="允许使用完整性未验证的内嵌合成图",
             variable=self.allow_unverified_var,
@@ -597,10 +846,15 @@ class MainWindow(ctk.CTk):
         )
         container.grid(row=row, column=0, padx=12, pady=4, sticky="ew")
         container.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(container, text=label).grid(
+        ctk.CTkLabel(
+            container,
+            text=label,
+            text_color=THEME.text_secondary,
+            font=ui_font(13),
+        ).grid(
             row=0, column=0, padx=(0, 8)
         )
-        menu = ctk.CTkOptionMenu(
+        menu = make_option_menu(
             container,
             values=values,
             variable=variable,
@@ -610,72 +864,121 @@ class MainWindow(ctk.CTk):
         return menu
 
     def _build_footer(self) -> None:
-        footer = ctk.CTkFrame(self, corner_radius=14)
+        footer = GlassCard(self, height=108)
         footer.grid(
             row=2,
             column=0,
-            padx=18,
+            padx=20,
             pady=(0, 18),
             sticky="ew",
         )
+        footer.grid_propagate(False)
         footer.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
+        status_surface = GlassCard(
             footer,
+            secondary=True,
+            textured=False,
+            corner_radius=14,
+            border_color=THEME.border_subtle,
+        )
+        status_surface.grid(
+            row=0,
+            column=0,
+            rowspan=3,
+            padx=(8, 4),
+            pady=8,
+            sticky="nsew",
+        )
+        status_surface.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            status_surface,
             textvariable=self.status_var,
             anchor="w",
-            font=ctk.CTkFont(weight="bold"),
-        ).grid(row=0, column=0, padx=14, pady=(10, 0), sticky="ew")
+            text_color=THEME.text_primary,
+            font=ui_font(15, weight="bold"),
+        ).grid(row=0, column=0, padx=14, pady=(8, 0), sticky="ew")
         ctk.CTkLabel(
-            footer,
+            status_surface,
             textvariable=self.progress_detail_var,
             anchor="w",
-            text_color=("gray35", "gray70"),
-        ).grid(row=1, column=0, padx=14, sticky="ew")
+            text_color=THEME.text_muted,
+            font=ui_font(12),
+        ).grid(row=1, column=0, padx=14, pady=(1, 0), sticky="ew")
 
-        self.progress_bar = ctk.CTkProgressBar(footer, height=8)
+        self.progress_bar = ctk.CTkProgressBar(
+            status_surface,
+            height=8,
+            corner_radius=4,
+            fg_color=THEME.bg_input,
+            progress_color=THEME.accent_secondary,
+            border_width=0,
+        )
         self.progress_bar.grid(
-            row=2, column=0, padx=14, pady=(6, 12), sticky="ew"
+            row=2,
+            column=0,
+            padx=14,
+            pady=(7, 9),
+            sticky="ew",
         )
         self.progress_bar.set(0)
 
-        self.open_output_button = ctk.CTkButton(
+        self.open_output_button = make_button(
             footer,
             text="打开输出",
-            width=92,
             command=self._open_last_output,
+            kind="secondary",
+            width=112,
+            height=44,
+            image=self._icons["folder"],
         )
         self.open_output_button.grid(
-            row=0, column=1, rowspan=3, padx=(6, 4), pady=12
+            row=0,
+            column=1,
+            rowspan=3,
+            padx=(6, 4),
+            pady=27,
         )
-        self.open_report_button = ctk.CTkButton(
+        self.open_report_button = make_button(
             footer,
             text="查看报告",
-            width=92,
             command=self._open_last_report,
+            kind="secondary",
+            width=112,
+            height=44,
+            image=self._icons["report"],
         )
         self.open_report_button.grid(
-            row=0, column=2, rowspan=3, padx=4, pady=12
+            row=0, column=2, rowspan=3, padx=4, pady=27
         )
-        self.cancel_button = ctk.CTkButton(
+        self.cancel_button = make_button(
             footer,
             text="取消",
-            width=82,
-            fg_color=("#B04A4A", "#9B3B3B"),
-            hover_color=("#963A3A", "#842F2F"),
             command=self._cancel_active_task,
+            kind="danger",
+            width=96,
+            height=44,
+            image=self._icons["close"],
         )
         self.cancel_button.grid(
-            row=0, column=3, rowspan=3, padx=4, pady=12
+            row=0, column=3, rowspan=3, padx=4, pady=27
         )
-        self.export_button = ctk.CTkButton(
+        self.export_button = make_button(
             footer,
             text="开始导出",
-            width=112,
             command=self._on_export,
+            kind="primary",
+            width=132,
+            height=46,
+            image=self._icons["sparkle"],
         )
         self.export_button.grid(
-            row=0, column=4, rowspan=3, padx=(4, 14), pady=12
+            row=0,
+            column=4,
+            rowspan=3,
+            padx=(4, 18),
+            pady=26,
         )
 
     def _configure_drag_and_drop(self) -> None:
@@ -683,10 +986,23 @@ class MainWindow(ctk.CTk):
             TkinterDnD.require(self)
             self.drop_frame.drop_target_register(DND_FILES)
             self.drop_frame.dnd_bind("<<Drop>>", self._on_drop)
+            self.drop_surface.drop_target_register(DND_FILES)
+            self.drop_surface.dnd_bind("<<Drop>>", self._on_drop)
         except Exception:
             # File selection remains available if a local Tcl/Tk build cannot
             # load the optional tkdnd extension.
             pass
+
+    @staticmethod
+    def _scroll_frame_to_top(frame: ctk.CTkScrollableFrame) -> None:
+        canvas = getattr(frame, "_parent_canvas", None)
+        if canvas is not None:
+            canvas.yview_moveto(0.0)
+
+    def _resize_background(self, event: tk.Event[tk.Misc]) -> None:
+        if event.widget is not self or event.width < 2 or event.height < 2:
+            return
+        self._background_image.configure(size=(event.width, event.height))
 
     def _bind_variable_updates(self) -> None:
         for variable in (
@@ -962,6 +1278,8 @@ class MainWindow(ctk.CTk):
         self._populate_slices(result.summary)
         self._set_preview(result.preview_png)
         self.photoshop_launch_var.set(False)
+        self.progress_bar.configure(mode="determinate")
+        self.progress_bar.set(0)
         self._set_mode("ready")
         self.status_var.set(
             f"已加载 {result.summary.source_path.name}"
@@ -1048,52 +1366,129 @@ class MainWindow(ctk.CTk):
         for child in self.slice_list.winfo_children():
             child.destroy()
         self._slice_rows.clear()
+        self._slice_row_frames.clear()
         for row_index, item in enumerate(summary.slices):
             row = ctk.CTkFrame(
                 self.slice_list,
-                fg_color=("gray92", "gray20"),
-                corner_radius=7,
+                fg_color=THEME.bg_selected,
+                corner_radius=THEME.radius_small,
+                border_width=1,
+                border_color=THEME.accent_soft,
             )
             row.grid(
                 row=row_index,
                 column=0,
-                padx=2,
-                pady=2,
+                padx=3,
+                pady=4,
                 sticky="ew",
             )
-            row.grid_columnconfigure(1, weight=1)
+            row.grid_columnconfigure(2, weight=1)
             selected = tk.BooleanVar(value=True)
-            ctk.CTkCheckBox(
+            checkbox = make_checkbox(
                 row,
                 text="",
-                width=28,
                 variable=selected,
-                command=self._on_form_change,
-            ).grid(row=0, column=0, padx=(8, 2), pady=7)
-            display_name = item.name.strip() or "未命名"
-            ctk.CTkLabel(
+                command=lambda index=item.index: self._on_slice_toggle(index),
+            )
+            checkbox.grid(row=0, column=0, padx=(10, 5), pady=9)
+            badge = ctk.CTkLabel(
                 row,
-                text=f"{row_index + 1:02d}  {display_name}",
+                text=f"{row_index + 1:02d}",
+                width=28,
+                height=24,
+                corner_radius=6,
+                fg_color=THEME.accent_primary,
+                text_color=THEME.text_primary,
+                font=ui_font(11, weight="bold"),
+            )
+            badge.grid(row=0, column=1, padx=(0, 8))
+            display_name = item.name.strip() or "未命名"
+            name_label = ctk.CTkLabel(
+                row,
+                text=display_name,
                 anchor="w",
-            ).grid(row=0, column=1, sticky="ew")
-            ctk.CTkLabel(
+                text_color=THEME.text_primary,
+                font=ui_font(13),
+            )
+            name_label.grid(row=0, column=2, sticky="ew")
+            coordinate_label = ctk.CTkLabel(
                 row,
                 text=f"({item.left}, {item.top})",
-                text_color=("gray40", "gray65"),
-            ).grid(row=0, column=2, padx=7)
+                text_color=THEME.text_muted,
+                font=ui_font(12),
+            )
+            coordinate_label.grid(row=0, column=3, padx=8)
             output_label = ctk.CTkLabel(
                 row,
                 text=f"{item.width}×{item.height} → —",
                 width=180,
                 anchor="e",
+                text_color=THEME.text_secondary,
+                font=ui_font(12),
             )
-            output_label.grid(row=0, column=3, padx=(4, 10))
+            output_label.grid(row=0, column=4, padx=(4, 12))
             self._slice_rows[item.index] = (selected, output_label)
+            self._slice_row_frames[item.index] = row
+            for widget in (
+                row,
+                checkbox,
+                badge,
+                name_label,
+                coordinate_label,
+                output_label,
+            ):
+                widget.bind(
+                    "<Enter>",
+                    lambda _event, index=item.index: (
+                        self._set_slice_row_hover(index, True)
+                    ),
+                    add="+",
+                )
+                widget.bind(
+                    "<Leave>",
+                    lambda _event, index=item.index: (
+                        self._set_slice_row_hover(index, False)
+                    ),
+                    add="+",
+                )
         self._refresh_output_dimensions()
+        self.after_idle(lambda: self._scroll_frame_to_top(self.slice_list))
+
+    def _on_slice_toggle(self, index: int) -> None:
+        self._update_slice_row_style(index)
+        self._on_form_change()
+
+    def _update_slice_row_style(
+        self,
+        index: int,
+        *,
+        hovered: bool = False,
+    ) -> None:
+        row = self._slice_row_frames.get(index)
+        values = self._slice_rows.get(index)
+        if row is None or values is None:
+            return
+        selected = values[0].get()
+        if selected:
+            row.configure(
+                fg_color=(
+                    THEME.bg_hover if hovered else THEME.bg_selected
+                ),
+                border_color=THEME.accent_soft,
+            )
+        else:
+            row.configure(
+                fg_color=(THEME.bg_hover if hovered else THEME.bg_card),
+                border_color=THEME.border_subtle,
+            )
+
+    def _set_slice_row_hover(self, index: int, hovered: bool) -> None:
+        self._update_slice_row_style(index, hovered=hovered)
 
     def _set_all_slices(self, selected: bool) -> None:
-        for variable, _ in self._slice_rows.values():
+        for index, (variable, _) in self._slice_rows.items():
             variable.set(selected)
+            self._update_slice_row_style(index)
         self._on_form_change()
 
     def _refresh_output_dimensions(self) -> None:
@@ -1145,7 +1540,16 @@ class MainWindow(ctk.CTk):
             return
         with Image.open(BytesIO(png_bytes)) as image:
             image.load()
-            self._preview_pil = image.copy()
+            preview = image.convert("RGBA")
+        preview.thumbnail((214, 204), Image.Resampling.LANCZOS)
+        mask = Image.new("L", preview.size, 0)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (0, 0, preview.width - 1, preview.height - 1),
+            radius=max(8, min(preview.size) // 14),
+            fill=255,
+        )
+        preview.putalpha(mask)
+        self._preview_pil = preview
         size = self._preview_pil.size
         self._preview_image = ctk.CTkImage(
             light_image=self._preview_pil,
@@ -1163,6 +1567,7 @@ class MainWindow(ctk.CTk):
         for child in self.slice_list.winfo_children():
             child.destroy()
         self._slice_rows.clear()
+        self._slice_row_frames.clear()
         self._set_preview(None)
 
     def _on_form_change(self) -> None:
@@ -1398,4 +1803,5 @@ class MainWindow(ctk.CTk):
         if self._preview_pil is not None:
             self._preview_pil.close()
             self._preview_pil = None
+        self._background_pil.close()
         self.destroy()
