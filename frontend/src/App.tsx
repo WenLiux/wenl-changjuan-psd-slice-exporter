@@ -395,6 +395,7 @@ function FileDropHeader({
   onDrop: (path: string) => void
   onAbout: () => void
 }) {
+  const fileName = path.split(/[\\/]/).pop() || ''
   return (
     <header
       className={`glass-card interactive-glow file-drop ${dragging ? 'is-dragging' : ''}`}
@@ -419,8 +420,9 @@ function FileDropHeader({
         </div>
       </div>
       <div className="file-copy">
-        <h1>{dragging ? '松开即可展开长卷' : '将 PSD 或 PSB 拖入这里'}</h1>
-        <p title={path}>{path || BRAND.functionalSlogan}</p>
+        <span className="file-context">{dragging ? '准备读取' : '当前文档'}</span>
+        <h1>{dragging ? '松开以读取文件' : fileName || '尚未选择文件'}</h1>
+        <p title={path}>{path || '支持 PSD、PSB'}</p>
       </div>
       <div className="file-actions">
         <div className="file-action-buttons">
@@ -431,7 +433,6 @@ function FileDropHeader({
             <Sparkles size={16} />选择文件
           </button>
         </div>
-        <small>{BRAND.localOnly}</small>
       </div>
     </header>
   )
@@ -659,12 +660,8 @@ function AboutDialog({ version, onClose }: { version: string; onClose: () => voi
       <section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-title">
         <button className="dialog-close" aria-label="关闭关于窗口" onClick={onClose}><X size={17} /></button>
         <img className="about-logo" src={logoWhite} alt="WENL / 长卷" />
-        <p className="about-slogan">{BRAND.slogan}</p>
-        <div className="about-rule" />
-        <h2 id="about-title">{BRAND.productName}</h2>
-        <p>{BRAND.functionalSlogan}</p>
-        <p className="about-local"><ShieldCheck size={15} />{BRAND.localOnly}</p>
-        <small>版本 {version}</small>
+        <h2 id="about-title">PSD / PSB 高保真切片导出</h2>
+        <p className="about-meta"><ShieldCheck size={14} />v{version} · 本地处理</p>
       </section>
     </div>
   )
