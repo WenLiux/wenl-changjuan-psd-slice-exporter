@@ -88,6 +88,30 @@ function App() {
   const [dragging, setDragging] = useState(false)
   const initialized = useRef(false)
 
+  useEffect(() => {
+    const cards = Array.from(
+      globalThis.document.querySelectorAll<HTMLElement>('.interactive-glow'),
+    )
+    const cleanups = cards.map((card) => {
+      const move = (event: PointerEvent) => {
+        const bounds = card.getBoundingClientRect()
+        card.style.setProperty('--glow-x', `${event.clientX - bounds.left}px`)
+        card.style.setProperty('--glow-y', `${event.clientY - bounds.top}px`)
+      }
+      const enter = () => card.classList.add('is-pointer-inside')
+      const leave = () => card.classList.remove('is-pointer-inside')
+      card.addEventListener('pointermove', move)
+      card.addEventListener('pointerenter', enter)
+      card.addEventListener('pointerleave', leave)
+      return () => {
+        card.removeEventListener('pointermove', move)
+        card.removeEventListener('pointerenter', enter)
+        card.removeEventListener('pointerleave', leave)
+      }
+    })
+    return () => cleanups.forEach((cleanup) => cleanup())
+  }, [])
+
   const showError = useCallback((text: string) => {
     setToast({ tone: 'error', text })
     window.setTimeout(() => setToast(null), 4500)
@@ -335,7 +359,7 @@ function FileDropHeader({
 }) {
   return (
     <header
-      className={`glass-card file-drop ${dragging ? 'is-dragging' : ''}`}
+      className={`glass-card interactive-glow file-drop ${dragging ? 'is-dragging' : ''}`}
       onDragEnter={(event) => { event.preventDefault(); onDragState(true) }}
       onDragOver={(event) => event.preventDefault()}
       onDragLeave={(event) => {
@@ -380,7 +404,7 @@ function DocumentPanel({
 }) {
   const loading = mode === 'loading_document'
   return (
-    <section className="glass-card document-panel">
+    <section className="glass-card interactive-glow document-panel">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">DOCUMENT</span>
@@ -466,7 +490,7 @@ function SettingsPanel({
   }
   const jpeg = settings.output_format === 'jpeg'
   return (
-    <aside className="glass-card settings-panel">
+    <aside className="glass-card interactive-glow settings-panel">
       <div className="panel-heading compact">
         <div><span className="eyebrow">EXPORT</span><h2>导出设置</h2></div>
         <span className="settings-state">自动保存</span>
@@ -481,7 +505,7 @@ function SettingsPanel({
         />
         <div className="inline-field">
           <label htmlFor="target-width">目标宽度</label>
-          <div className="input-with-unit">
+          <div className={`input-with-unit ${settings.width_mode === 'custom' ? 'is-enabled' : ''}`}>
             <input
               id="target-width"
               type="number"
@@ -501,7 +525,7 @@ function SettingsPanel({
           value={settings.output_format}
           onChange={(value) => update('output_format', value as AppSettings['output_format'])}
         />
-        <div className="two-fields">
+        <div className={`two-fields jpeg-fields ${jpeg ? 'is-enabled' : ''}`}>
           <div><label htmlFor="quality">JPEG 质量</label><input id="quality" type="number" min={1} max={100} value={settings.jpeg_quality} disabled={!jpeg} onChange={(event) => update('jpeg_quality', Number(event.target.value))} /></div>
           <div><label htmlFor="background">背景</label><div className="color-field"><span style={{ background: settings.jpeg_background }} /><input id="background" value={settings.jpeg_background} disabled={!jpeg} onChange={(event) => update('jpeg_background', event.target.value.toUpperCase())} /></div></div>
         </div>
@@ -550,7 +574,7 @@ function TaskFooter({
 }) {
   const busy = ['loading_document', 'exporting', 'cancelling'].includes(mode)
   return (
-    <footer className="glass-card task-footer">
+    <footer className="glass-card interactive-glow task-footer">
       <div className="task-status">
         <div className="task-title"><span className={`status-dot ${busy ? 'pulse' : ''}`} />{status}</div>
         <p>{progress?.slice ? `切片 ${progress.current}/${progress.total} · ${progress.slice.name}` : result ? `${result.output_directory} · ${result.elapsed_seconds.toFixed(1)} 秒` : `v${version} · 高保真合成图 · 原文件只读`}</p>
@@ -570,7 +594,8 @@ function TaskFooter({
 }
 
 function Segmented({ options, value, onChange }: { options: string[][]; value: string; onChange: (value: string) => void }) {
-  return <div className="segmented">{options.map(([key, label]) => <button type="button" key={key} className={value === key ? 'active' : ''} onClick={() => onChange(key)}>{label}</button>)}</div>
+  const selectedIndex = Math.max(0, options.findIndex(([key]) => key === value))
+  return <div className="segmented"><span className={`segmented-indicator position-${selectedIndex}`} />{options.map(([key, label]) => <button type="button" key={key} className={value === key ? 'active' : ''} onClick={() => onChange(key)}>{label}</button>)}</div>
 }
 
 function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (value: boolean) => void }) {
