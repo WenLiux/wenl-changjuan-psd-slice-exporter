@@ -107,6 +107,8 @@ def run_package_smoke(
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--legacy-ui", action="store_true")
+    parser.add_argument("--web-debug", action="store_true")
     parser.add_argument("--package-smoke-source", type=Path)
     parser.add_argument("--package-smoke-output", type=Path)
     parser.add_argument("--package-smoke-result", type=Path)
@@ -133,15 +135,20 @@ def main(argv: list[str] | None = None) -> int:
             target_width=arguments.package_smoke_width,
         )
 
-    import customtkinter as ctk
+    if arguments.legacy_ui:
+        import customtkinter as ctk
 
-    from app.ui.main_window import MainWindow
+        from app.ui.main_window import MainWindow
 
-    ctk.set_appearance_mode("dark")
-    ctk.set_default_color_theme("blue")
-    app = MainWindow()
-    app.mainloop()
-    return 0
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        app = MainWindow()
+        app.mainloop()
+        return 0
+
+    from app.desktop import run_webview
+
+    return run_webview(debug=arguments.web_debug)
 
 
 if __name__ == "__main__":
