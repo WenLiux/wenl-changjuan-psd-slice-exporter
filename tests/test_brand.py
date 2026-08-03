@@ -34,3 +34,15 @@ def test_dark_client_uses_explicit_light_logo() -> None:
     assert "logo-black.svg" not in app_source
     assert "#F4F5F7" in white_logo
     assert "#111111" in black_logo
+
+
+def test_windows_icon_uses_explicit_light_symbol() -> None:
+    icon_svg = (
+        PROJECT_ROOT / "packaging/assets/WENL-Changjuan.svg"
+    ).read_text(encoding="utf-8")
+    icon_path = PROJECT_ROOT / "packaging/assets/WENL-Changjuan.ico"
+
+    assert "#F4F5F7" in icon_svg
+    assert "fill: currentColor" not in icon_svg
+    assert icon_path.is_file()
+    assert icon_path.stat().st_size > 10_000

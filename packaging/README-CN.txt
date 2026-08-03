@@ -1,12 +1,12 @@
-PSD / PSB 高保真切片导出器 0.3.0
-=================================
+WENL 长卷｜PSD / PSB 高保真切片导出工具 0.3.1
+================================================
 
 启动
 ----
 
-双击 PSD-PSB-Slice-Exporter.exe。
+双击 WENL-Changjuan.exe。
 
-0.3.0 使用 WebView2 渲染新的网页式桌面界面。Windows 10 / 11 通常已
+0.3.1 使用 WebView2 渲染网页式桌面界面。Windows 10 / 11 通常已
 包含 WebView2 Runtime；若启动时提示缺失，请安装 Microsoft Edge
 WebView2 Runtime 后重试。
 
@@ -42,7 +42,9 @@ Photoshop”才会使用回退。
 
 普通设置保存在：
 
-%APPDATA%\PSD Slice Exporter\settings.json
+%APPDATA%\WENL\Changjuan\settings.json
+
+如果检测到旧版设置，程序会自动复制到新目录，并保留旧文件。
 
 允许启动 Photoshop、色彩/模式转换、使用未验证合成图等安全授权不会
 保存，每次都需要明确选择。

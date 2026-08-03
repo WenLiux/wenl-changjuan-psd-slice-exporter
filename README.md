@@ -21,10 +21,10 @@ Completed:
 - Stage 9: reproducible Windows onedir packaging and packaged-app verification.
 - Stage 10: final release acceptance and Windows artifact handoff.
 - Version 0.2.0: restrained blue-glass CustomTkinter UI redesign.
-- Version 0.3.0: pywebview/WebView2 desktop shell with a React, TypeScript,
+- Version 0.3.1: WENL / 长卷 branded pywebview/WebView2 desktop shell with a React, TypeScript,
   and CSS-variable interface; typed JSON bridge and background task events.
 
-Version 0.3.0 is the default WENL / 长卷 desktop interface. The 0.2.0 CustomTkinter UI is
+Version 0.3.1 is the default WENL / 长卷 desktop interface. The 0.2.0 CustomTkinter UI is
 temporarily available through `--legacy-ui` for migration rollback.
 
 Reports:
@@ -221,7 +221,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 The application is created at:
 
 ```text
-dist\PSD-PSB-Slice-Exporter\PSD-PSB-Slice-Exporter.exe
+dist\WENL-Changjuan\WENL-Changjuan.exe
 ```
 
 Keep the EXE, `_internal` directory, and `README-CN.txt` together. The

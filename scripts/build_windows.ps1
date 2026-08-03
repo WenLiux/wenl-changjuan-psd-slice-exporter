@@ -26,6 +26,10 @@ try {
     finally {
         Pop-Location
     }
+    & $resolvedPython (Join-Path $projectRoot "scripts\build_icon.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Icon build failed with exit code $LASTEXITCODE."
+    }
     & $resolvedPython -m PyInstaller `
         --clean `
         --noconfirm `
@@ -39,7 +43,7 @@ finally {
 }
 
 $executable = Join-Path $projectRoot (
-    "dist\PSD-PSB-Slice-Exporter\PSD-PSB-Slice-Exporter.exe"
+    "dist\WENL-Changjuan\WENL-Changjuan.exe"
 )
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw "Packaged executable was not created: $executable"
