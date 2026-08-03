@@ -14,19 +14,14 @@ was started.
 
 ## Reviewed implementation
 
-Primary source:
-
-```text
-D:\CodexProjects\export_psd_slices_1440.py
-```
-
 Tracked legacy baseline:
 
 ```text
 legacy/export_psd_slices_1440.py
 ```
 
-Both files have the same SHA-256 after the Stage 0 correction:
+The reviewed local source and tracked baseline had the same SHA-256 after the
+Stage 0 correction:
 
 ```text
 0ef92ee90d35ec42e0acb772f370300334f57ffc59093a0e1a74ad7d0ad26fb7

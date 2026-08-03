@@ -87,11 +87,7 @@ PSD / PSB / Photoshop
 
 当前测试版直接使用项目源码和已经构建的 Web UI，不属于正式发布包。
 
-## 七、当前项目位置
-
-```text
-D:\CodexProjects\psd_slice_exporter
-```
+## 七、项目结构
 
 主要目录：
 

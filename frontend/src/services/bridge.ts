@@ -34,7 +34,7 @@ const demoSlices = [
 }))
 
 export const demoDocument: DocumentInfo = {
-  source_path: 'C:\\Users\\RUNWE251223\\Downloads\\详情切片.psb',
+  source_path: 'C:\\Design\\详情切片.psb',
   file_name: '详情切片.psb',
   source_size: 248_000_000,
   width: 1440,
