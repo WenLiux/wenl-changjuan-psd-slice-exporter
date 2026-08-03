@@ -2,7 +2,7 @@
   <img src="packaging/assets/WENL-Changjuan.svg" width="128" alt="WENL 长卷">
 </p>
 
-<h1 align="center">WENL 长卷｜PSD / PSB 高保真切片导出工具</h1>
+<h1 align="center"> 长卷｜PSD / PSB 高保真切片导出工具</h1>
 
 <p align="center">
   面向 Windows 的 Photoshop 超长画布切片工具。保持原始宽度与画质，绕过旧导出流程的 8192 像素长边缩小限制。
