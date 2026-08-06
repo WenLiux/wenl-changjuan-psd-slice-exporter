@@ -1,132 +1,77 @@
-# PSD/PSB 高保真切片导出器——项目交接说明
+# WENL 长卷项目维护说明
+
+本文是面向维护者和贡献者的项目运行说明。当前正式版本为 `v0.3.1`，
+公开下载和版本变化请以 README 与 GitHub Release 为准。
 
 ## 当前结论
 
-项目已完成 0.2.0 版本开发、Windows 打包和最终验收，可直接用于：
+WENL 长卷是 Windows PSD / PSB 高保真切片导出工具，支持：
 
-- 读取 PSD/PSB 内嵌切片；
-- 按原始宽度或指定宽度（例如 1440、750）导出；
-- 避开 Photoshop 旧版“存储为 Web 所用格式”长边限制；
-- 导出 PNG/JPEG；
-- 保持全局缩放坐标一致；
-- 自动生成并检查验证报告；
-- 在需要时安全调用 Photoshop 高保真回退；
-- 通过 Windows 桌面界面选择文件、拖放、预览、勾选切片并导出。
+- 读取 PSD / PSB 内嵌切片和合成图；
+- 按原始宽度或指定宽度导出；
+- 全局对齐的切片缩放与坐标换算；
+- PNG / JPEG、透明背景、JPEG 质量和颜色策略；
+- 文件选择与原生拖拽、预览、切片勾选和导出进度；
+- 验证报告、取消任务和碰撞安全的输出目录；
+- 可选的 Photoshop 高保真回退。
 
-当前支持的用户成品为：
+## 当前版本和发布物
 
-```text
-release\PSD-PSB-Slice-Exporter-Windows-x64-v0.2.0.zip
-```
+- 稳定版本：`v0.3.1`
+- 平台：Windows x64
+- 发行形式：onedir 便携 ZIP
+- 程序入口：`WENL-Changjuan.exe`
+- 发布页：[WENL 长卷 v0.3.1](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.1)
 
-解压后必须保持 `PSD-PSB-Slice-Exporter.exe` 与 `_internal` 文件夹在一起。
+解压后必须保持 EXE 与 `_internal` 文件夹的相对位置。程序不依赖开发服务器，
+正式便携版运行时不需要互联网连接。
 
-## 已完成阶段
+## 开发环境
 
-| 阶段 | 内容 | 状态 |
-| --- | --- | --- |
-| 0 | 旧方案审计、像素回归基线 | 完成 |
-| 1 | V6/V7/V8 切片解析和类型模型 | 完成 |
-| 2 | PSD/PSB 内嵌合成图读取 | 完成 |
-| 3 | 原尺寸、防覆盖切片导出 | 完成 |
-| 4 | 全局对齐的目标宽度缩放 | 完成 |
-| 5 | 导出前检查和导出后验证 | 完成 |
-| 6 | PNG/JPEG、ICC 和色彩处理 | 完成 |
-| 7 | Photoshop 安全高保真回退 | 完成 |
-| 8 | Windows 桌面 UI、后台任务和缓存 | 完成 |
-| 9 | PyInstaller Windows 打包和成品验证 | 完成 |
-| 10 | 最终验收和交付 | 完成 |
-| 0.2.0 | 深蓝玻璃视觉重构和新版打包验收 | 完成 |
+推荐使用 Windows x64、Python 3.12、Git 和 Node.js 20。Photoshop 仅在测试或
+明确使用高保真回退时需要。
 
-各阶段的详细报告位于 `docs`。
-
-## 已验证结果
-
-- 测试共收集 140 项，两个真实样本和真实 GUI 全部启用时 140 项通过。
-- 最终打包程序分别成功处理 PSD 和 PSB，各导出 14 个切片。
-- 从交付 ZIP 解压后的程序已再次按 1440px 导出并验证成功。
-- 最终 GUI 能正常启动、响应并关闭。
-- tkinterdnd2 打包运行库能正常加载。
-- Photoshop COM 兼容组件已包含在 Windows 包中。
-- 两个原始 Photoshop 文件在全部验收后哈希不变。
-
-详细数据见：
-
-```text
-docs\stage-9-report.md
-docs\stage-10-acceptance.md
-docs\ui-redesign-report.md
-```
-
-## 回家后直接运行成品
-
-1. 解压 `PSD-PSB-Slice-Exporter-Windows-x64-v0.2.0.zip`。
-2. 打开解压后的 `PSD-PSB-Slice-Exporter` 文件夹。
-3. 双击 `PSD-PSB-Slice-Exporter.exe`。
-4. 将 PSD/PSB 拖进窗口，或点击“选择文件”。
-5. 选择原始宽度，或输入 1440、750 等目标宽度。
-6. 点击“开始导出”。
-
-程序不会覆盖以前的导出结果，每次都会创建新的安全输出目录。
-
-## 回家后继续开发
-
-推荐环境：
-
-```text
-Windows 10/11 x64
-Python 3.12 x64
-Git
-可选：Adobe Photoshop
-```
-
-如果使用交接包里的完整 Git 仓库包：
-
-```powershell
-git clone psd_slice_exporter-full-history.bundle psd_slice_exporter
-cd psd_slice_exporter
-```
-
-创建开发环境：
+创建 Python 环境：
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pip install -r requirements-photoshop.txt
 ```
 
-启动源码版桌面程序：
+启动源码版：
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.main
 ```
 
-运行普通测试：
+构建前端：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+cd frontend
+npm.cmd ci
+npm.cmd run build
+cd ..
 ```
 
-带真实样本运行回归测试：
+运行测试：
 
 ```powershell
-$env:PSD_SLICE_V8_FIXTURE = '你的路径\565656未标题-1.psd'
-$env:PSD_SLICE_V6_FIXTURE = '你的路径\详情切片.psb'
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest
 ```
 
-## 重新构建 Windows 成品
+真实 PSD / PSB 回归文件必须通过环境变量指向本机路径，不要复制到仓库：
 
-创建独立发布环境：
+```powershell
+$env:PSD_SLICE_V8_FIXTURE = '本机测试文件路径'
+$env:PSD_SLICE_V6_FIXTURE = '本机测试文件路径'
+.\.venv\Scripts\python.exe -m pytest
+```
+
+## 构建 Windows 便携版
 
 ```powershell
 python -m venv .venv-release
 .\.venv-release\Scripts\python.exe -m pip install -r requirements-build.txt
-```
-
-构建：
-
-```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\build_windows.ps1
 ```
@@ -134,49 +79,34 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 输出目录：
 
 ```text
-dist\PSD-PSB-Slice-Exporter
+dist\WENL-Changjuan
 ```
 
-## 关键安全约束
+打包时请保留 `WENL-Changjuan.exe`、`_internal` 和 `README-CN.txt` 的完整结构。
+
+## 安全约束
 
 - 默认不启动或调用 Photoshop。
+- 原始 PSD / PSB 以只读方式使用。
 - Photoshop 回退只处理系统临时目录中的源文件副本。
 - 回退完成后不保存临时文档、不退出 Photoshop。
-- 调用前后会核对原文件 SHA-256、大小和修改时间。
-- 外部修改过的源文件必须重新加载，缓存不会继续导出。
-- “允许启动 Photoshop”“允许模式转换”“允许未验证合成图”不会保存，
-  每次使用都需要重新明确选择。
+- 调用前后核对原文件 SHA-256、大小和修改时间。
+- 启动 Photoshop、模式转换和未验证合成图均为单次授权，不会永久保存。
+- 公开提交不得包含客户素材、个人信息、绝对路径或带路径的截图。
 
-## 当前已知限制
+## 已知限制
 
-- 0.2.0 Windows 成品尚未进行数字签名，首次运行可能出现 SmartScreen
-  提示。
-- 当前正式交付形式是 onedir 文件夹 ZIP，不能只复制 EXE。
-- Photoshop 高保真回退 V1 主要面向 8-bit RGB 文档。
-- 单次第三方 PSD 解码、Pillow 缩放或图片编码内部不能即时中断；取消会在
-  当前安全点完成。
-- onefile 版本尚未作为正式交付物，当前 ZIP 已提供单文件下载体验。
+- 当前正式交付为 Windows onedir ZIP，尚未提供安装向导和数字签名。
+- Photoshop 高保真回退 v1 主要面向 8 位 RGB 文档。
+- 单次第三方 PSD 解码、Pillow 缩放或图片编码无法在库内部即时中断，
+  取消会在当前安全点完成。
+- 真实 PSD / PSB 回归样本不随公开仓库分发。
 
-## 后续可选方向
+## 维护顺序
 
-当前版本已经可用，下一阶段不是修复阻断问题，而是产品化增强：
-
-1. 给 EXE 做正式代码签名和安装包。
-2. 增加自动更新或版本检查。
-3. 扩展更多色彩模式和 Photoshop 回退测试矩阵。
-4. 增加批量处理多个 PSD/PSB。
-5. 增加可保存的导出预设。
-6. 增加 CI 中的 Windows 打包和签名流程。
-7. 根据真实用户反馈调整 UI 文案和默认值。
-
-## 给新的 Codex 任务使用的开场说明
-
-可以把下面这段直接发给新的 Codex：
-
-```text
-请先阅读 README.md、docs/HANDOFF-CN.md、
-docs/stage-9-report.md 和 docs/stage-10-acceptance.md。
-这是 PSD/PSB 高保真切片导出器 0.2.0，阶段 0-10 和视觉重构已完成。
-不要修改或覆盖 samples 中的原始 PSD/PSB；涉及真实样本时先后核对
-SHA-256。先运行测试并查看 git status，再继续我接下来提出的功能。
-```
+1. 阅读 [项目文档导航](README.md) 和 [贡献指南](../CONTRIBUTING.md)。
+2. 确认 `git status -sb` 并保持提交范围聚焦。
+3. 运行 Python 测试和前端生产构建。
+4. 检查公开内容是否泄露本机路径或测试素材。
+5. 更新版本说明、Release 附件和 SHA-256。
+6. 推送后核对 GitHub Actions、远程提交和发布页附件。

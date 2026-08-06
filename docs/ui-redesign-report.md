@@ -48,17 +48,9 @@ shadow_card / shadow_accent / preview_glow
 
 ## 视觉变化
 
-旧版：
-
-![旧版界面](ui-reference/current-ui.png)
-
-0.2.0 标准窗口：
-
-![0.2.0 标准窗口](ui-reference/redesigned-ui-1240x820.png)
-
-0.2.0 最小窗口：
-
-![0.2.0 最小窗口](ui-reference/redesigned-ui-1100x720.png)
+公开仓库不再包含视觉验收截图。原始截图中带有本机用户名和本地文件路径，
+为避免公开个人环境信息，截图已从公开版本移除；视觉规范与验收结论仍保留在
+本报告和 `docs/ui-visual-rebuild-spec.md` 中。
 
 主要变化：
 
@@ -150,7 +142,7 @@ EXE
 - `README.md`
 - `docs/HANDOFF-CN.md`
 - `docs/ui-visual-rebuild-spec.md`
-- `docs/ui-reference/*`
+- `docs/ui-reference/README.md`
 - `docs/ui-redesign-report.md`
 
 ## 仍需注意

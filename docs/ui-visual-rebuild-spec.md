@@ -6,13 +6,8 @@
 
 ## 一、任务目标
 
-当前界面参考图：
-
-- `docs/ui-reference/current-ui.png`
-
-目标效果参考图：
-
-- `docs/ui-reference/target-ui.png`
+公开仓库不保留带本机路径的原始参考截图。视觉要求以本规范中的颜色、层级、
+交互和验收标准为准；公开版截图说明见 `docs/ui-reference/README.md`。
 
 请将当前界面从普通深色工具风格，重构为目标图中的：
 
@@ -639,19 +634,12 @@ shadow_accent
 
 ## 十四、参考图使用方式
 
-不要仅通过文字想象目标效果，请实际读取并观察：
-
-- `docs/ui-reference/current-ui.png`
-- `docs/ui-reference/target-ui.png`
-
-其中：
-
-- `current-ui.png` 用于确认现有信息结构
-- `target-ui.png` 用于确认颜色、材质、圆角、光效和层级
+历史参考图仅用于本地设计验收，不随公开仓库分发。实施时应根据本规范复核
+信息结构、颜色、材质、圆角、光效和层级。
 
 执行原则：
 
-> 以 current-ui 的功能完整度为底线，以 target-ui 的视觉质感为目标。
+> 以现有界面的功能完整度为底线，以本规范定义的视觉质感为目标。
 
 ---
 

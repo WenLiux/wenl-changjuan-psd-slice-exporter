@@ -140,9 +140,23 @@ WENL 长卷品牌版使用：
 
 详细发布内容请查看：[v0.3.1 发布说明](docs/v0.3.1-release.md)。
 
+## 许可证与公开仓库
+
+本仓库公开前已完成本地路径、测试素材和个人信息审计。源代码现采用
+[PolyForm Noncommercial License 1.0.0](LICENSE)：允许非商业目的的使用、研究、修改和
+再分发，但商业使用需要事先取得书面授权。WENL / 长卷名称、Logo、图标和品牌视觉
+资产不包含在源代码许可证授权内，详见 [NOTICE](NOTICE) 与
+[品牌资产说明](docs/legal/trademarks.md)。
+
 ## 项目文档
 
+- [文档导航](docs/README.md)
 - [GitHub 发布清单](docs/GITHUB-PUBLISH.md)
+- [贡献指南](CONTRIBUTING.md)
+- [安全问题报告](SECURITY.md)
+- [许可证](LICENSE) · [NOTICE](NOTICE)
+- [商业使用说明](docs/legal/commercial-use.md)
+- [第三方依赖声明](docs/legal/third-party-notices.md)
 - [最终验收报告](docs/stage-10-acceptance.md)
 - [Windows 构建报告](docs/stage-9-report.md)
 - [Web UI 重构报告](docs/ui-redesign-report.md)

@@ -1,0 +1,60 @@
+name: 问题反馈
+description: 报告可复现的功能、导出或界面问题
+title: "[问题] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请不要上传真实 PSD / PSB、客户素材、个人简历、联系方式或带本地路径的截图。
+  - type: input
+    id: version
+    attributes:
+      label: 使用版本
+      description: 例如 v0.3.1，或填写本地提交号。
+      placeholder: v0.3.1
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题范围
+      options:
+        - PSD / PSB 读取
+        - 切片解析
+        - 宽度与缩放
+        - PNG / JPEG 导出
+        - Photoshop 回退
+        - Windows 客户端 UI
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请按顺序说明操作步骤，并使用脱敏后的示例文件名。
+      placeholder: |
+        1. 打开……
+        2. 选择……
+        3. 点击……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 请填写 Windows 版本、文件类型、颜色模式等，不要填写用户名或完整路径。
