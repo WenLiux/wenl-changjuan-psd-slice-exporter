@@ -5,7 +5,7 @@
 ## 面向使用者
 
 - [项目首页](../README.md)：功能概览、下载、首次使用和命令行示例。
-- [v0.3.1 发布说明](v0.3.1-release.md)：版本亮点、下载附件、校验值和安全边界。
+- [v0.3.2 发布说明](v0.3.2-release.md)：版本亮点、下载附件、校验值和安全边界。
 - [Windows 打包报告](stage-9-report.md)：便携版结构与成品验证。
 - [最终验收报告](stage-10-acceptance.md)：当前版本的验收结论和已知限制。
 
@@ -36,9 +36,9 @@
 
 ## 当前状态
 
-- 当前稳定版本：`v0.3.1`
+- 当前稳定版本：`v0.3.2`
 - 目标平台：Windows x64
-- Python 测试：`139 passed, 11 skipped`
+- Python 测试：`143 passed, 11 skipped`
 - 前端生产构建：通过
 - 发布包：GitHub Release 中的 Windows 便携版
 

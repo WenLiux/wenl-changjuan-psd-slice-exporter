@@ -1,6 +1,6 @@
 [project]
 name = "psd-slice-exporter"
-version = "0.3.1"
+version = "0.3.2"
 description = "WENL / Changjuan high-fidelity PSD/PSB slice exporter"
 requires-python = ">=3.11,<3.15"
 dependencies = [

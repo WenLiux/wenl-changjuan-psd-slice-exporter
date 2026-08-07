@@ -68,7 +68,7 @@ async function call<T>(name: string, ...args: unknown[]): Promise<ApiResponse<T>
   const api = window.pywebview?.api
   if (!api?.[name]) {
     if (name === 'get_initial_state') {
-      return mockResponse({ version: '0.3.1', settings: defaults } as T)
+      return mockResponse({ version: '0.3.2', settings: defaults } as T)
     }
     if (name === 'get_events') return mockResponse([] as T)
     if (name.startsWith('open_') || name === 'save_settings') {

@@ -12,8 +12,8 @@
 
 推荐直接下载已经构建好的 Windows 便携版：
 
-- [下载 WENL 长卷 v0.3.1](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.1)
-- 文件：`WENL-Changjuan-Windows-x64-v0.3.1.zip`
+- [下载 WENL 长卷 v0.3.2](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.2)
+- 文件：`WENL-Changjuan-Windows-x64-v0.3.2.zip`
 
 解压后运行 `WENL-Changjuan.exe`。请不要单独移动 EXE，程序必须与 `_internal` 文件夹保持原有相对位置。
 
@@ -137,17 +137,17 @@ WENL 长卷品牌版使用：
 
 ## 当前版本
 
-当前稳定版本：`v0.3.1`
+当前稳定版本：`v0.3.2`
 
 本版本包含 WENL 长卷品牌化 WebView2 客户端、React/TypeScript 界面、原生拖拽修复、宽度切换逻辑修复和 Windows 多尺寸程序图标。
 
 当前自动测试结果：
 
 ```text
-139 passed, 11 skipped
+143 passed, 11 skipped
 ```
 
-详细发布内容请查看：[v0.3.1 发布说明](docs/v0.3.1-release.md)。
+详细发布内容请查看：[v0.3.2 发布说明](docs/v0.3.2-release.md)。
 
 ## 许可证与公开仓库
 
