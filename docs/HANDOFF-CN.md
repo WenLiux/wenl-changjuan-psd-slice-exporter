@@ -1,6 +1,6 @@
 # WENL 长卷项目维护说明
 
-本文是面向维护者和贡献者的项目运行说明。当前正式版本为 `v0.3.1`，
+本文是面向维护者和贡献者的项目运行说明。当前正式版本为 `v0.3.2`，
 公开下载和版本变化请以 README 与 GitHub Release 为准。
 
 ## 当前结论
@@ -9,6 +9,7 @@ WENL 长卷是 Windows PSD / PSB 高保真切片导出工具，支持：
 
 - 读取 PSD / PSB 内嵌切片和合成图；
 - 按原始宽度或指定宽度导出；
+- 支持不切片的完整长图导出；
 - 全局对齐的切片缩放与坐标换算；
 - PNG / JPEG、透明背景、JPEG 质量和颜色策略；
 - 文件选择与原生拖拽、预览、切片勾选和导出进度；
@@ -17,11 +18,11 @@ WENL 长卷是 Windows PSD / PSB 高保真切片导出工具，支持：
 
 ## 当前版本和发布物
 
-- 稳定版本：`v0.3.1`
+- 稳定版本：`v0.3.2`
 - 平台：Windows x64
 - 发行形式：onedir 便携 ZIP
 - 程序入口：`WENL-Changjuan.exe`
-- 发布页：[WENL 长卷 v0.3.1](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.1)
+- 发布页：[WENL 长卷 v0.3.2](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.2)
 
 解压后必须保持 EXE 与 `_internal` 文件夹的相对位置。程序不依赖开发服务器，
 正式便携版运行时不需要互联网连接。

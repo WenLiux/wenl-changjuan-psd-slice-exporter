@@ -80,7 +80,7 @@ function outputSize(slice: SliceInfo, document: DocumentInfo, settings: AppSetti
 }
 
 function App() {
-  const [version, setVersion] = useState('0.3.1')
+  const [version, setVersion] = useState('0.3.2')
   const [settings, setSettings] = useState<AppSettings>(initialSettings)
   const [document, setDocument] = useState<DocumentInfo | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())

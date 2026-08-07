@@ -5,7 +5,7 @@
 - 仓库：[WenLiux/wenl-changjuan-psd-slice-exporter](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter)
 - 状态：公开
 - 默认分支：`main`
-- 当前稳定版本：`v0.3.1`
+- 当前稳定版本：`v0.3.2`
 - 项目简介：WENL 长卷｜Windows PSD / PSB 高保真切片导出工具
 
 ## 公开内容边界
@@ -33,14 +33,14 @@ PSD / PSB、客户素材和截图中的 UI 文本。
 
 ## 当前 Release
 
-[v0.3.1 正式发布页](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.1)
+[v0.3.2 正式发布页](https://github.com/WenLiux/wenl-changjuan-psd-slice-exporter/releases/tag/v0.3.2)
 
 发布附件：
 
-- `WENL-Changjuan-Windows-x64-v0.3.1.zip`
-- `WENL-Changjuan-Windows-x64-v0.3.1.sha256`
+- `WENL-Changjuan-Windows-x64-v0.3.2.zip`
+- `WENL-Changjuan-Windows-x64-v0.3.2.sha256`
 
-发布正文统一维护在 [`docs/v0.3.1-release.md`](v0.3.1-release.md)。更新正文时，
+发布正文统一维护在 [`docs/v0.3.2-release.md`](v0.3.2-release.md)。更新正文时，
 同时确认下载链接、ZIP 大小、SHA-256 和附件名称仍然一致。
 
 ## 日常维护
