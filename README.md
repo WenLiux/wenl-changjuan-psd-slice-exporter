@@ -22,6 +22,7 @@
 - 读取 PSD 与 PSB 文件中的 Photoshop 切片。
 - 按文件原始宽度导出，不再被强制缩小到 419px 等异常尺寸。
 - 支持指定输出宽度，并保持全部切片的全局比例与坐标对齐。
+- 支持不切片的完整长图导出：整张画布输出为一个 PNG 或 JPEG 文件。
 - 支持单独选择需要导出的切片。
 - 支持 PNG、JPEG、透明背景、JPEG 质量及颜色策略。
 - 自动生成不冲突的输出目录，可选 ZIP 压缩。
@@ -34,10 +35,11 @@
 
 1. 打开 `WENL-Changjuan.exe`。
 2. 将 PSD / PSB 文件拖入窗口，或点击“选择文件”。
-3. 选择“原始宽度”或填写指定宽度。
-4. 选择切片、文件格式和输出目录。
-5. 点击“开始导出”。
-6. 完成后可直接打开输出目录或查看验证报告。
+3. 在“导出内容”中选择“切片导出”或“完整长图”。
+4. 选择“原始宽度”或填写指定宽度。
+5. 切片模式下选择需要导出的切片；完整长图模式会输出整张画布。
+6. 选择格式和输出目录，点击“开始导出”。
+7. 完成后可直接打开输出目录或查看验证报告。
 
 ## 文件与安全
 
@@ -80,6 +82,13 @@ python scripts/export_slices.py input.psd --width 1440 --format jpeg
 python scripts/export_slices.py input.psd --format jpeg `
   --jpeg-quality 100 --background "#F5F5F5" --color srgb
 ```
+
+完整长图：
+
+~~~powershell
+python scripts/export_full_image.py input.psb --format png
+python scripts/export_full_image.py input.psd --width 2160 --format jpeg --jpeg-quality 95 --background "#FFFFFF" --color srgb
+~~~
 
 ## 从源码运行
 
@@ -157,6 +166,7 @@ WENL 长卷品牌版使用：
 - [许可证](LICENSE) · [NOTICE](NOTICE)
 - [商业使用说明](docs/legal/commercial-use.md)
 - [第三方依赖声明](docs/legal/third-party-notices.md)
+- [完整长图导出说明](docs/full-canvas-export.md)
 - [最终验收报告](docs/stage-10-acceptance.md)
 - [Windows 构建报告](docs/stage-9-report.md)
 - [Web UI 重构报告](docs/ui-redesign-report.md)

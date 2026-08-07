@@ -224,6 +224,25 @@ def test_custom_width_is_applied_and_none_selects_all(
     assert options.selected_slice_indices == frozenset({4, 9})
 
 
+def test_full_canvas_options_do_not_require_slice_selection(
+    tmp_path: Path,
+) -> None:
+    options = build_export_options(
+        AppSettings(
+            export_mode="full_canvas",
+            width_mode="custom",
+            target_width=5,
+        ),
+        _document(),
+        output_directory=tmp_path,
+        selected_slice_indices=set(),
+    )
+
+    assert options.export_mode == "full_canvas"
+    assert options.target_width == 5
+    assert options.selected_slice_indices is None
+
+
 @pytest.mark.parametrize("value", [None, "", "   "])
 def test_blank_output_directory_uses_source_parent(
     tmp_path: Path,

@@ -242,6 +242,17 @@ def _decode_settings(
         _decode_output_directory,
         warnings,
     )
+    export_mode = _read_field(
+        values,
+        "export_mode",
+        defaults.export_mode,
+        lambda value: _decode_choice(
+            value,
+            {"slices", "full_canvas"},
+            "export_mode",
+        ),
+        warnings,
+    )
     width_mode = _read_field(
         values,
         "width_mode",
@@ -352,6 +363,7 @@ def _decode_settings(
     return (
         AppSettings(
             output_directory=output_directory,
+            export_mode=export_mode,
             width_mode=width_mode,
             target_width=target_width,
             allow_upscale=allow_upscale,

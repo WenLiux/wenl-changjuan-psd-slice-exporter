@@ -43,6 +43,7 @@ def test_settings_round_trip_through_bridge(tmp_path: Path) -> None:
         payload = api.get_initial_state()["data"]["settings"]
         payload.update(
             {
+                "export_mode": "full_canvas",
                 "width_mode": "custom",
                 "target_width": 750,
                 "output_format": "jpeg",
@@ -55,6 +56,7 @@ def test_settings_round_trip_through_bridge(tmp_path: Path) -> None:
         assert response["success"] is True
         saved = store.load()
         assert saved.target_width == 750
+        assert saved.export_mode == "full_canvas"
         assert saved.output_format == "jpeg"
         assert saved.output_directory == tmp_path / "输出 目录"
     finally:

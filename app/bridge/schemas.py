@@ -109,15 +109,24 @@ def progress_payload(progress: ExportProgress) -> dict[str, Any]:
 
 
 def export_result_payload(result: ExportResult) -> dict[str, Any]:
+    exported_count = (
+        len(result.exported_slices)
+        if result.export_mode == "slices"
+        else int(result.output_path is not None)
+    )
     return {
         "status": result.status,
         "success": result.success,
+        "export_mode": result.export_mode,
         "source_path": str(result.source_path),
         "output_directory": str(result.output_directory),
+        "output_path": (
+            str(result.output_path) if result.output_path is not None else None
+        ),
         "archive_path": (
             str(result.archive_path) if result.archive_path is not None else None
         ),
-        "exported_count": len(result.exported_slices),
+        "exported_count": exported_count,
         "failure_count": len(result.failures),
         "failures": [item.message for item in result.failures],
         "elapsed_seconds": result.elapsed_seconds,

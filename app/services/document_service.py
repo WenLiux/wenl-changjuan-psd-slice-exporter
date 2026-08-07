@@ -12,7 +12,10 @@ from app.core.photoshop_bridge import (
     PhotoshopCompositeOptions,
     read_photoshop_composite,
 )
-from app.core.slice_parser import parse_document_slices
+from app.core.slice_parser import (
+    SliceResourceMissingError,
+    parse_document_slices,
+)
 from app.models.composite_result import CompositeResult
 from app.models.export_result import ExportOptions, ExportResult
 from app.models.prepared_document import (
@@ -20,6 +23,7 @@ from app.models.prepared_document import (
     PreparedDocument,
     SourceFingerprint,
 )
+from app.models.slice_info import SliceIssue, SliceParseResult
 from app.services.errors import (
     ExportPreflightError,
     ExportServiceError,
@@ -83,7 +87,24 @@ def prepare_document(
             total=0,
         )
         psd = PSDImage.open(source)
-        slice_result = parse_document_slices(psd)
+        try:
+            slice_result = parse_document_slices(psd)
+        except SliceResourceMissingError:
+            slice_result = SliceParseResult(
+                source_version="none",
+                all_slices=(),
+                exportable_slices=(),
+                excluded_slices=(),
+                issues=(
+                    SliceIssue(
+                        code="no_slice_resource",
+                        message=(
+                            "The document has no Photoshop slice resource; "
+                            "complete-canvas export remains available."
+                        ),
+                    ),
+                ),
+            )
         raise_if_cancelled(cancel_check)
         emit_progress(
             progress_callback,
@@ -249,10 +270,13 @@ def build_document_load_result(
     preview_slice_index: int | None = None
     image = prepared.composite.image
     slices = prepared.slice_result.exportable_slices
-    if image is not None and slices:
-        first_slice = slices[0]
-        preview_slice_index = first_slice.index
-        crop = image.crop(first_slice.bounds)
+    if image is not None:
+        if slices:
+            first_slice = slices[0]
+            preview_slice_index = first_slice.index
+            crop = image.crop(first_slice.bounds)
+        else:
+            crop = image.copy()
         try:
             crop.thumbnail(preview_size)
             buffer = BytesIO()

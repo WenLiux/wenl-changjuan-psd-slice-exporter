@@ -330,6 +330,7 @@ class AppApi:
             output_directory=(
                 Path(output_directory) if output_directory else None
             ),
+            export_mode=str(payload.get("export_mode", "slices")),
             width_mode=str(payload.get("width_mode", "original")),
             target_width=int(payload.get("target_width", 1440)),
             allow_upscale=bool(payload.get("allow_upscale", True)),

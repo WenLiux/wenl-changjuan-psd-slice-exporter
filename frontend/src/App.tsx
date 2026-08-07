@@ -36,8 +36,8 @@ const phaseText: Record<string, string> = {
   photoshop: '正在等待 Photoshop 高保真渲染',
   resizing: '正在统一缩放画布',
   starting: '正在创建安全输出目录',
-  exporting: '正在导出切片',
-  written: '切片已写入并验证',
+  exporting: '正在写入导出文件',
+  written: '导出文件已写入并验证',
   validating: '正在生成验证报告',
   archiving: '正在创建 ZIP 压缩包',
 }
@@ -52,6 +52,7 @@ const compositeText: Record<string, string> = {
 
 const initialSettings: AppSettings = {
   output_directory: '',
+  export_mode: 'slices',
   width_mode: 'original',
   target_width: 1440,
   allow_upscale: true,
@@ -112,20 +113,49 @@ function App() {
       globalThis.document.querySelectorAll<HTMLElement>('.interactive-glow'),
     )
     const cleanups = cards.map((card) => {
-      const move = (event: PointerEvent) => {
+      let pointerX = 0
+      let pointerY = 0
+      let pointerInside = false
+      let frame = 0
+
+      const apply = () => {
+        frame = 0
+        if (!pointerInside) return
         const bounds = card.getBoundingClientRect()
-        card.style.setProperty('--glow-x', `${event.clientX - bounds.left}px`)
-        card.style.setProperty('--glow-y', `${event.clientY - bounds.top}px`)
+        card.style.setProperty('--glow-x', `${pointerX - bounds.left}px`)
+        card.style.setProperty('--glow-y', `${pointerY - bounds.top}px`)
       }
-      const enter = () => card.classList.add('is-pointer-inside')
-      const leave = () => card.classList.remove('is-pointer-inside')
+      const schedule = (clientX: number, clientY: number) => {
+        pointerX = clientX
+        pointerY = clientY
+        if (!frame) frame = window.requestAnimationFrame(apply)
+      }
+      const move = (event: PointerEvent) => schedule(event.clientX, event.clientY)
+      const enter = (event: PointerEvent) => {
+        pointerInside = true
+        schedule(event.clientX, event.clientY)
+        card.classList.add('is-pointer-inside')
+      }
+      const leave = () => {
+        pointerInside = false
+        card.classList.remove('is-pointer-inside')
+      }
+      const scrollables = Array.from(
+        card.querySelectorAll<HTMLElement>('.settings-panel-scroll, .slice-list'),
+      )
+      const syncAfterScroll = () => {
+        if (pointerInside) schedule(pointerX, pointerY)
+      }
       card.addEventListener('pointermove', move)
       card.addEventListener('pointerenter', enter)
       card.addEventListener('pointerleave', leave)
+      scrollables.forEach((scrollable) => scrollable.addEventListener('scroll', syncAfterScroll, { passive: true }))
       return () => {
+        if (frame) window.cancelAnimationFrame(frame)
         card.removeEventListener('pointermove', move)
         card.removeEventListener('pointerenter', enter)
         card.removeEventListener('pointerleave', leave)
+        scrollables.forEach((scrollable) => scrollable.removeEventListener('scroll', syncAfterScroll))
       }
     })
     return () => cleanups.forEach((cleanup) => cleanup())
@@ -167,7 +197,9 @@ function App() {
       setToast({
         tone: event.result.success ? 'success' : 'error',
         text: event.result.success
-          ? `${event.result.exported_count} 张切片已成功导出`
+          ? event.result.export_mode === 'full_canvas'
+            ? '完整长图已成功导出'
+            : `${event.result.exported_count} 张切片已成功导出`
           : '导出完成，但验证发现问题。',
       })
       window.setTimeout(() => setToast(null), 4000)
@@ -261,7 +293,7 @@ function App() {
     setResult(null)
     const response = await bridge.startExport({
       settings,
-      selected_slice_indices: [...selected],
+      selected_slice_indices: settings.export_mode === 'slices' ? [...selected] : null,
       photoshop_allow_launch: false,
       allow_mode_conversion: false,
       allow_unverified_composite: false,
@@ -294,11 +326,19 @@ function App() {
     if (progress) return phaseText[progress.phase] ?? progress.phase
     if (mode === 'loading_document') return '正在展开长卷'
     if (mode === 'cancelling') return '正在安全取消'
-    if (result?.success) return `${result.exported_count} 张切片已成功导出 · 源文件保持不变`
+    if (result?.success) {
+      return result.export_mode === 'full_canvas'
+        ? '完整长图已成功导出 · 源文件保持不变'
+        : `${result.exported_count} 张切片已成功导出 · 源文件保持不变`
+    }
     if (mode === 'export_cancelled') return '任务已取消'
-    if (document) return `长卷已展开 · ${selectedCount} / ${document.slice_count} 张切片待导出`
+    if (document) {
+      return settings.export_mode === 'full_canvas'
+        ? '长卷已展开 · 完整长图待导出'
+        : `长卷已展开 · ${selectedCount} / ${document.slice_count} 张切片待导出`
+    }
     return '等待展开长卷'
-  }, [document, mode, progress, result, selectedCount])
+  }, [document, mode, progress, result, selectedCount, settings.export_mode])
 
   return (
     <main className="app-shell">
@@ -321,6 +361,7 @@ function App() {
         <DocumentPanel
           document={document}
           settings={settings}
+          exportMode={settings.export_mode}
           selected={selected}
           mode={mode}
           onToggle={(index) => setSelected((current) => {
@@ -348,7 +389,12 @@ function App() {
         progress={progress}
         progressPercent={progressPercent}
         result={result}
-        canExport={Boolean(document && selectedCount && !busy)}
+        canExport={Boolean(
+          document
+          && (settings.export_mode === 'full_canvas' || selectedCount)
+          && !busy,
+        )}
+        exportMode={settings.export_mode}
         onCancel={cancel}
         onExport={startExport}
       />
@@ -441,6 +487,7 @@ function FileDropHeader({
 function DocumentPanel({
   document,
   settings,
+  exportMode,
   selected,
   mode,
   onToggle,
@@ -448,6 +495,7 @@ function DocumentPanel({
 }: {
   document: DocumentInfo | null
   settings: AppSettings
+  exportMode: AppSettings['export_mode']
   selected: Set<number>
   mode: UiMode
   onToggle: (index: number) => void
@@ -459,7 +507,7 @@ function DocumentPanel({
       <div className="panel-heading">
         <div>
           <span className="eyebrow">DOCUMENT</span>
-          <h2>文档与切片</h2>
+          <h2>{exportMode === 'full_canvas' ? '文档与画布' : '文档与切片'}</h2>
         </div>
         {document && <span className="status-chip"><ShieldCheck size={14} /> 本地安全处理</span>}
       </div>
@@ -491,6 +539,10 @@ function DocumentPanel({
             </div>
           </div>
 
+          {exportMode === 'full_canvas' ? (
+            <FullCanvasSummary document={document} settings={settings} />
+          ) : (
+          <>
           <div className="slice-heading">
             <div>
               <h3>导出切片</h3>
@@ -517,11 +569,48 @@ function DocumentPanel({
                   <span className="slice-size">{slice.width}×{slice.height}<i>→</i>{width}×{height}</span>
                 </button>
               )
-            })}
-          </div>
-        </>
-      )}
+             })}
+           </div>
+          </>
+          )}
+         </>
+       )}
     </section>
+  )
+}
+
+function FullCanvasSummary({
+  document,
+  settings,
+}: {
+  document: DocumentInfo
+  settings: AppSettings
+}) {
+  const outputWidth = settings.width_mode === 'original'
+    ? document.width
+    : Math.max(
+      1,
+      Math.round(
+        document.width
+        * (
+          (!settings.allow_upscale
+            ? Math.min(settings.target_width, document.width)
+            : settings.target_width)
+          / document.width
+        ),
+      ),
+    )
+  const outputHeight = Math.round(document.height * outputWidth / document.width)
+  return (
+    <div className="full-canvas-summary">
+      <div className="full-canvas-icon"><ImageIcon size={22} /></div>
+      <div>
+        <h3>完整长图</h3>
+        <p>按整张画布导出 1 个文件，不会按 Photoshop 切片拆分。</p>
+        <strong>{outputWidth} × {outputHeight}px</strong>
+        <span>{settings.output_format.toUpperCase()} · {settings.width_mode === 'original' ? '原始宽度' : '指定宽度'}</span>
+      </div>
+    </div>
   )
 }
 
@@ -549,12 +638,22 @@ function SettingsPanel({
   )
   return (
     <aside className="glass-card interactive-glow settings-panel">
-      <div className="panel-heading compact">
-        <div><span className="eyebrow">EXPORT</span><h2>导出设置</h2></div>
-        <span className="settings-state">自动保存</span>
-      </div>
+      <div className="settings-panel-scroll">
+        <div className="panel-heading compact">
+          <div><span className="eyebrow">EXPORT</span><h2>导出设置</h2></div>
+          <span className="settings-state">自动保存</span>
+        </div>
 
-      <fieldset disabled={disabled}>
+        <fieldset disabled={disabled}>
+        <label className="field-label">导出内容</label>
+        <Segmented
+          options={[['slices', '切片导出'], ['full_canvas', '完整长图']]}
+          value={settings.export_mode}
+          onChange={(value) => update('export_mode', value as AppSettings['export_mode'])}
+        />
+        <p className="field-hint">完整长图会按整张画布输出 1 个 PNG 或 JPEG 文件。</p>
+
+        <div className="section-divider" />
         <label className="field-label">输出宽度</label>
         <Segmented
           options={[['original', '原始宽度'], ['custom', '指定宽度']]}
@@ -605,7 +704,8 @@ function SettingsPanel({
           <Toggle label="完成后打开目录" checked={settings.open_output_folder} onChange={(value) => update('open_output_folder', value)} />
           <Toggle label="同时创建 ZIP" checked={settings.create_zip} onChange={(value) => update('create_zip', value)} />
         </div>
-      </fieldset>
+        </fieldset>
+      </div>
     </aside>
   )
 }
@@ -618,6 +718,7 @@ function TaskFooter({
   progressPercent,
   result,
   canExport,
+  exportMode,
   onCancel,
   onExport,
 }: {
@@ -628,6 +729,7 @@ function TaskFooter({
   progressPercent: number
   result: ExportResult | null
   canExport: boolean
+  exportMode: AppSettings['export_mode']
   onCancel: () => void
   onExport: () => void
 }) {
@@ -645,7 +747,7 @@ function TaskFooter({
         {busy ? (
           <button className="button button-danger" disabled={mode === 'cancelling'} onClick={onCancel}><X size={17} />{mode === 'cancelling' ? '取消中' : '取消'}</button>
         ) : (
-          <button className="button button-primary export-button" disabled={!canExport} onClick={onExport}><Play size={17} fill="currentColor" />开始导出</button>
+          <button className="button button-primary export-button" disabled={!canExport} onClick={onExport}><Play size={17} fill="currentColor" />{exportMode === 'full_canvas' ? '导出完整长图' : '开始导出'}</button>
         )}
       </div>
     </footer>

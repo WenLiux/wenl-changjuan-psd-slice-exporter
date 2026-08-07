@@ -6,6 +6,7 @@ from typing import Literal
 
 
 WidthMode = Literal["original", "custom"]
+ExportMode = Literal["slices", "full_canvas"]
 OutputFormat = Literal["png", "jpeg"]
 ColorPolicy = Literal["auto", "preserve", "srgb"]
 NamingRule = Literal[
@@ -21,6 +22,7 @@ class AppSettings:
     """Validated user preferences for the desktop exporter."""
 
     output_directory: Path | None = None
+    export_mode: ExportMode = "slices"
     width_mode: WidthMode = "original"
     target_width: int = 1440
     allow_upscale: bool = True
@@ -39,6 +41,8 @@ class AppSettings:
             Path,
         ):
             raise TypeError("Output directory must be a Path or None.")
+        if self.export_mode not in {"slices", "full_canvas"}:
+            raise ValueError("Export mode must be slices or full_canvas.")
         if self.width_mode not in {"original", "custom"}:
             raise ValueError("Width mode must be original or custom.")
         if (

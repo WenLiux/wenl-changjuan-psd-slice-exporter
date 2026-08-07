@@ -25,6 +25,7 @@ ProgressPhase = Literal[
 ]
 OutputFormat = Literal["png", "jpeg"]
 ColorPolicy = Literal["auto", "preserve", "srgb"]
+ExportMode = Literal["slices", "full_canvas"]
 PhotoshopFallbackMode = Literal["disabled", "if_needed", "always"]
 NamingRule = Literal[
     "legacy_sequence_dimensions",
@@ -36,9 +37,10 @@ NamingRule = Literal[
 
 @dataclass(frozen=True, slots=True)
 class ExportOptions:
-    """Options supported by the slice export pipeline."""
+    """Options supported by the slice and complete-canvas pipelines."""
 
     output_parent: Path | None = None
+    export_mode: ExportMode = "slices"
     create_zip: bool = False
     allow_unverified_composite: bool = False
     selected_slice_indices: frozenset[int] | None = None
@@ -59,6 +61,12 @@ class ExportOptions:
     write_validation_reports: bool = True
 
     def __post_init__(self) -> None:
+        normalized_export_mode = self.export_mode.lower()
+        if normalized_export_mode not in {"slices", "full_canvas"}:
+            raise ValueError(
+                "Export mode must be slices or full_canvas."
+            )
+        object.__setattr__(self, "export_mode", normalized_export_mode)
         normalized_format = self.output_format.lower()
         if normalized_format == "jpg":
             normalized_format = "jpeg"
@@ -171,6 +179,8 @@ class ExportResult:
     validation_report: ValidationReport
     validation_json_path: Path | None
     validation_text_path: Path | None
+    export_mode: ExportMode = "slices"
+    output_path: Path | None = None
 
     @property
     def success(self) -> bool:

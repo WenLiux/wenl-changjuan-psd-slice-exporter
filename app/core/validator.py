@@ -356,3 +356,173 @@ def validate_export_outputs(
                 )
             )
     return ValidationReport(tuple(findings))
+
+
+def validate_full_canvas_output(
+    output_path: Path,
+    *,
+    composite: CompositeResult,
+    expected_size: tuple[int, int],
+    expected_format: str,
+    expected_icc_profile: bytes | None,
+    expected_alpha: bool | None,
+    exact_pixel_compare: bool = False,
+    cancel_check: Callable[[], bool] | None = None,
+) -> ValidationReport:
+    """Validate one complete-canvas image independently of slice metadata."""
+
+    findings: list[ValidationFinding] = []
+    if cancel_check is not None and cancel_check():
+        return ValidationReport(
+            (
+                ValidationFinding(
+                    phase="post_export",
+                    code="validation_cancelled",
+                    severity="warning",
+                    message=(
+                        "Output validation was stopped because cancellation "
+                        "was requested."
+                    ),
+                ),
+            )
+        )
+    if not output_path.is_file() or output_path.stat().st_size <= 0:
+        return ValidationReport(
+            (
+                ValidationFinding(
+                    phase="post_export",
+                    code="missing_or_empty_file",
+                    severity="error",
+                    message="Complete-canvas output is missing or empty.",
+                ),
+            )
+        )
+
+    try:
+        with Image.open(output_path) as image:
+            image.load()
+            if image.format != expected_format:
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="format_mismatch",
+                        severity="error",
+                        message=(
+                            f"Exported format is {image.format}; expected "
+                            f"{expected_format}."
+                        ),
+                    )
+                )
+            if image.size != expected_size:
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="dimension_mismatch",
+                        severity="error",
+                        message=(
+                            "Complete-canvas output dimensions do not match "
+                            "the requested target."
+                        ),
+                        coordinates=(
+                            expected_size[0],
+                            expected_size[1],
+                            image.width,
+                            image.height,
+                        ),
+                    )
+                )
+            if expected_format == "JPEG" and image.mode != "RGB":
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="jpeg_mode_mismatch",
+                        severity="error",
+                        message="Exported JPEG is not RGB.",
+                    )
+                )
+            if (
+                expected_alpha is not None
+                and image_has_alpha(image) != expected_alpha
+            ):
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="alpha_mismatch",
+                        severity="error",
+                        message=(
+                            "Exported alpha-channel behavior does not match "
+                            "the encoding plan."
+                        ),
+                    )
+                )
+            if (
+                image.info.get("icc_profile") != expected_icc_profile
+            ):
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="icc_profile_mismatch",
+                        severity="error",
+                        message=(
+                            "Exported ICC profile does not match the "
+                            "encoding plan."
+                        ),
+                    )
+                )
+            extrema = image.getextrema()
+            band_extrema = (
+                (extrema,)
+                if extrema and isinstance(extrema[0], int)
+                else extrema
+            )
+            if image_has_alpha(image) and "A" in image.getbands():
+                alpha_index = image.getbands().index("A")
+                alpha_extrema = band_extrema[alpha_index]
+                if alpha_extrema[1] == 0:
+                    findings.append(
+                        ValidationFinding(
+                            phase="post_export",
+                            code="fully_transparent",
+                            severity="warning",
+                            message="Complete-canvas output is fully transparent.",
+                        )
+                    )
+            elif band_extrema and all(
+                low == high for low, high in band_extrema
+            ):
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="single_color",
+                        severity="warning",
+                        message="Complete-canvas output contains one constant color.",
+                    )
+                )
+
+            if (
+                exact_pixel_compare
+                and composite.image is not None
+                and image.size == composite.image.size
+                and _images_differ(image, composite.image)
+            ):
+                findings.append(
+                    ValidationFinding(
+                        phase="post_export",
+                        code="pixel_mismatch",
+                        severity="error",
+                        message=(
+                            "Lossless original-size output pixels differ "
+                            "from the embedded composite."
+                        ),
+                    )
+                )
+    except Exception as error:
+        findings.append(
+            ValidationFinding(
+                phase="post_export",
+                code="image_reopen_failed",
+                severity="error",
+                message=f"Complete-canvas output cannot be reopened: {error}",
+            )
+        )
+    return ValidationReport(tuple(findings))

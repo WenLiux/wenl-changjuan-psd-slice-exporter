@@ -20,7 +20,11 @@ from app.core.resizer import (
     resize_full_composite,
     resize_mapped_slice,
 )
-from app.core.validator import validate_export_outputs, validate_slice_layout
+from app.core.validator import (
+    validate_export_outputs,
+    validate_full_canvas_output,
+    validate_slice_layout,
+)
 from app.models.composite_result import CompositeResult
 from app.models.export_result import (
     ExportedSlice,
@@ -159,6 +163,305 @@ def _output_filename(
     return candidate
 
 
+def _full_canvas_filename(
+    source_path: Path,
+    *,
+    width: int,
+    height: int,
+    extension: str,
+) -> str:
+    stem = safe_filename_component(
+        source_path.stem,
+        fallback="document",
+    )
+    return f"{stem}_full_{width}x{height}{extension}"
+
+
+def export_prepared_full_canvas(
+    source_path: Path,
+    slice_result: SliceParseResult,
+    composite: CompositeResult,
+    options: ExportOptions,
+    *,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
+) -> ExportResult:
+    """Export the complete composite as one long image."""
+
+    del slice_result
+    _raise_if_cancelled(cancel_check)
+    if composite.image is None:
+        raise ExportPreflightError(
+            composite.error or "No embedded composite is available for export."
+        )
+    if not composite.is_reliable and not options.allow_unverified_composite:
+        raise ExportPreflightError(
+            composite.warning
+            or "The embedded composite cannot be confirmed as complete."
+        )
+
+    try:
+        encoding_plan = build_image_encoding_plan(composite, options)
+    except ImageEncodingError as error:
+        raise ExportPreflightError(str(error)) from error
+    try:
+        scale_plan = build_scale_plan(
+            canvas_width=composite.width,
+            canvas_height=composite.height,
+            slices=(),
+            target_width=options.target_width,
+            allow_upscale=options.allow_upscale,
+        )
+    except ResizePlanError as error:
+        raise ExportPreflightError(str(error)) from error
+
+    if (
+        not scale_plan.is_original_size
+        and scale_plan.estimated_rgba_bytes > options.max_full_resize_bytes
+    ):
+        estimated_mib = (
+            scale_plan.estimated_rgba_bytes / (1024 * 1024)
+        )
+        limit_mib = options.max_full_resize_bytes / (1024 * 1024)
+        raise ExportPreflightError(
+            "Complete-canvas export needs one resized image in memory "
+            f"(about {estimated_mib:.1f} MiB), above the configured "
+            f"{limit_mib:.1f} MiB safety limit. Reduce the target width or "
+            "use slice export instead."
+        )
+
+    source_path = Path(source_path)
+    output_parent = options.output_parent or source_path.parent
+    folder_label = options.folder_label
+    if folder_label is None:
+        folder_label = (
+            "full_original"
+            if scale_plan.is_original_size
+            else f"full_{scale_plan.output_width}px"
+        )
+    source_signature_before = _source_signature(source_path)
+    started = time.perf_counter()
+    output_directory: Path
+    try:
+        output_directory = create_collision_safe_directory(
+            output_parent,
+            f"{source_path.stem}_{folder_label}",
+            reserve_zip_path=options.create_zip,
+        )
+    except Exception as error:
+        raise ExportPreflightError(
+            f"Unable to create the output directory: {error}"
+        ) from error
+
+    output_path = output_directory / _full_canvas_filename(
+        source_path,
+        width=scale_plan.output_width,
+        height=scale_plan.output_height,
+        extension=encoding_plan.extension,
+    )
+    temporary_path = output_path.with_name(
+        f".{output_path.name}.part"
+    )
+    failures: list[ExportFailure] = []
+    archive_path: Path | None = None
+    validation_json_path: Path | None = None
+    validation_text_path: Path | None = None
+    cancelled = False
+    render_image: Image.Image | None = composite.image
+    resized_composite: Image.Image | None = None
+    if not scale_plan.is_original_size:
+        _emit(
+            progress_callback,
+            phase="resizing",
+            current=0,
+            total=1,
+        )
+        _raise_if_cancelled(cancel_check)
+        try:
+            resized_composite = resize_full_composite(
+                composite.image,
+                scale_plan,
+            )
+        except Exception as error:
+            raise ExportPreflightError(
+                f"Unable to resize the complete composite: {error}"
+            ) from error
+        if _is_cancelled(cancel_check):
+            resized_composite.close()
+            raise ExportCancelledError("Export was cancelled after resizing.")
+        render_image = resized_composite
+
+    _emit(
+        progress_callback,
+        phase="starting",
+        current=0,
+        total=1,
+    )
+    try:
+        if _is_cancelled(cancel_check):
+            cancelled = True
+        else:
+            _emit(
+                progress_callback,
+                phase="exporting",
+                current=1,
+                total=1,
+                output_path=output_path,
+            )
+            encoded_image: Image.Image | None = None
+            try:
+                if render_image is None:
+                    raise RuntimeError("Complete render image is unavailable.")
+                encoded_image = prepare_image_for_encoding(
+                    render_image,
+                    encoding_plan,
+                )
+                save_options = save_options_for_plan(encoding_plan)
+                if encoding_plan.output_format == "png":
+                    save_options["compress_level"] = (
+                        options.png_compress_level
+                    )
+                encoded_image.save(temporary_path, **save_options)
+                temporary_path.replace(output_path)
+                _verify_image(
+                    output_path,
+                    (
+                        scale_plan.output_width,
+                        scale_plan.output_height,
+                    ),
+                    (
+                        "PNG"
+                        if encoding_plan.output_format == "png"
+                        else "JPEG"
+                    ),
+                )
+                _emit(
+                    progress_callback,
+                    phase="written",
+                    current=1,
+                    total=1,
+                    output_path=output_path,
+                )
+            except Exception as error:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                failures.append(
+                    ExportFailure(
+                        message=f"Complete long image could not be exported: {error}",
+                        output_path=output_path,
+                        exception_type=type(error).__name__,
+                    )
+                )
+            finally:
+                if encoded_image is not None:
+                    encoded_image.close()
+    finally:
+        if resized_composite is not None:
+            resized_composite.close()
+
+    _emit(
+        progress_callback,
+        phase="validating",
+        current=1 if output_path.is_file() else 0,
+        total=1,
+    )
+    post_export_report = validate_full_canvas_output(
+        output_path,
+        composite=composite,
+        expected_size=(
+            scale_plan.output_width,
+            scale_plan.output_height,
+        ),
+        expected_format=(
+            "PNG" if encoding_plan.output_format == "png" else "JPEG"
+        ),
+        expected_icc_profile=encoding_plan.output_icc_profile,
+        expected_alpha=encoding_plan.expected_alpha,
+        exact_pixel_compare=(
+            scale_plan.is_original_size
+            and encoding_plan.exact_pixels_preserved
+        ),
+        cancel_check=cancel_check,
+    )
+    validation_report = post_export_report
+    if options.write_validation_reports:
+        try:
+            validation_json_path, validation_text_path = (
+                validation_report.write(output_directory)
+            )
+        except Exception as error:
+            failures.append(
+                ExportFailure(
+                    message=f"Validation report could not be written: {error}",
+                    exception_type=type(error).__name__,
+                )
+            )
+
+    status: ExportStatus
+    if cancelled:
+        status = "cancelled"
+    elif failures or not validation_report.passed:
+        status = "completed_with_errors"
+    else:
+        status = "completed"
+    if status == "completed" and _is_cancelled(cancel_check):
+        status = "cancelled"
+
+    if options.create_zip and status == "completed":
+        _emit(
+            progress_callback,
+            phase="archiving",
+            current=1,
+            total=1,
+        )
+        try:
+            archive_path, archive_cancelled = _create_zip_archive(
+                output_directory,
+                cancel_check=cancel_check,
+                progress_callback=progress_callback,
+            )
+            if archive_cancelled:
+                status = "cancelled"
+        except Exception as error:
+            failures.append(
+                ExportFailure(
+                    message=f"ZIP creation failed: {error}",
+                    exception_type=type(error).__name__,
+                )
+            )
+            status = "completed_with_errors"
+
+    source_unchanged = (
+        source_signature_before is not None
+        and _source_signature(source_path) == source_signature_before
+    )
+    return ExportResult(
+        source_path=source_path,
+        output_directory=output_directory,
+        archive_path=archive_path,
+        status=status,
+        exported_slices=(),
+        failures=tuple(failures),
+        slice_issues=(),
+        composite_source=composite.source,
+        composite_warning=composite.warning,
+        source_unchanged=source_unchanged,
+        elapsed_seconds=time.perf_counter() - started,
+        output_format=encoding_plan.output_format,
+        color_policy=encoding_plan.color_policy,
+        target_width=scale_plan.output_width,
+        scale=scale_plan.scale,
+        resize_strategy=(
+            "none" if scale_plan.is_original_size else "full_canvas"
+        ),
+        validation_report=validation_report,
+        validation_json_path=validation_json_path,
+        validation_text_path=validation_text_path,
+        export_mode="full_canvas",
+        output_path=output_path if output_path.is_file() else None,
+    )
+
+
 def export_prepared_slices(
     source_path: Path,
     slice_result: SliceParseResult,
@@ -170,6 +473,15 @@ def export_prepared_slices(
 ) -> ExportResult:
     """Export normalized slices using one global output-width mapping."""
 
+    if options.export_mode == "full_canvas":
+        return export_prepared_full_canvas(
+            source_path,
+            slice_result,
+            composite,
+            options,
+            progress_callback=progress_callback,
+            cancel_check=cancel_check,
+        )
     _raise_if_cancelled(cancel_check)
     if composite.image is None:
         raise ExportPreflightError(
@@ -566,6 +878,29 @@ def export_original_size(
     return export_slices(
         source_path,
         original_options,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+        photoshop_automation=photoshop_automation,
+    )
+
+
+def export_full_canvas(
+    source_path: str | Path,
+    options: ExportOptions | None = None,
+    *,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
+    photoshop_automation: PhotoshopAutomation | None = None,
+) -> ExportResult:
+    """Export one complete canvas image instead of individual slices."""
+
+    full_options = replace(
+        options or ExportOptions(),
+        export_mode="full_canvas",
+    )
+    return export_slices(
+        source_path,
+        full_options,
         progress_callback=progress_callback,
         cancel_check=cancel_check,
         photoshop_automation=photoshop_automation,

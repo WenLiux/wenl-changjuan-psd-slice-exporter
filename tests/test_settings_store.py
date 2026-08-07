@@ -65,6 +65,7 @@ def test_round_trip_writes_versioned_json(tmp_path: Path) -> None:
     path = tmp_path / "偏好" / "settings.json"
     expected = AppSettings(
         output_directory=tmp_path / "导出",
+        export_mode="full_canvas",
         width_mode="custom",
         target_width=1440,
         allow_upscale=False,

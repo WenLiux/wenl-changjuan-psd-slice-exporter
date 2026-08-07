@@ -1713,6 +1713,7 @@ class MainWindow(ctk.CTk):
         try:
             return AppSettings(
                 output_directory=Path(output_text) if output_text else None,
+                export_mode=self._settings.export_mode,
                 width_mode=(
                     "original"
                     if self.width_mode_var.get() == "原始宽度"
