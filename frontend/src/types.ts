@@ -10,6 +10,7 @@ export type UiMode =
 
 export interface AppSettings {
   output_directory: string
+  export_mode: 'slices' | 'full_canvas'
   width_mode: 'original' | 'custom'
   target_width: number
   allow_upscale: boolean
@@ -72,7 +73,9 @@ export interface ExportProgress {
 export interface ExportResult {
   status: string
   success: boolean
+  export_mode: 'slices' | 'full_canvas'
   output_directory: string
+  output_path: string | null
   exported_count: number
   failure_count: number
   failures: string[]

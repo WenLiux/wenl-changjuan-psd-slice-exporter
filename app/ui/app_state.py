@@ -194,15 +194,23 @@ def build_export_options(
         output_directory,
         default=document.source_path.parent,
     )
-    selected = _normalize_slice_indices(
-        selected_slice_indices,
-        document,
-        none_means_all=True,
-        require_one=True,
+    selected = (
+        _normalize_slice_indices(
+            selected_slice_indices,
+            document,
+            none_means_all=True,
+            require_one=True,
+        )
+        if settings.export_mode == "slices"
+        else None
     )
     selected_slices = tuple(
-        item for item in document.slices if item.index in selected
+        item
+        for item in document.slices
+        if selected is not None and item.index in selected
     )
+    if settings.export_mode == "full_canvas":
+        selected_slices = ()
     _build_form_scale_plan(settings, document, selected_slices)
 
     _require_bool("photoshop_allow_launch", photoshop_allow_launch)
@@ -214,6 +222,7 @@ def build_export_options(
 
     return ExportOptions(
         output_parent=output_parent,
+        export_mode=settings.export_mode,
         create_zip=settings.create_zip,
         allow_unverified_composite=allow_unverified_composite,
         selected_slice_indices=selected,

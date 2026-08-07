@@ -2,6 +2,7 @@ import type { ApiResponse, AppEvent, AppSettings, DocumentInfo } from '../types'
 
 const defaults: AppSettings = {
   output_directory: '',
+  export_mode: 'slices',
   width_mode: 'original',
   target_width: 1440,
   allow_upscale: true,

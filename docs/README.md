@@ -32,6 +32,7 @@
 - [商标与品牌资产](legal/trademarks.md)：WENL / 长卷名称、Logo 和图标的使用边界。
 - [商业使用说明](legal/commercial-use.md)：商业场景、非商业场景和授权联系说明。
 - [第三方依赖声明](legal/third-party-notices.md)：运行时、构建时和 Web UI 依赖的核对入口。
+- [完整长图导出说明](full-canvas-export.md)：整张画布单文件导出、命名和内存保护。
 
 ## 当前状态
 

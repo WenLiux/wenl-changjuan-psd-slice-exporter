@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from app.core.slice_parser import SliceResourceMissingError
 import app.services.document_service as document_service_module
 from app.models.composite_result import CompositeResult
 from app.models.export_result import ExportOptions
@@ -125,6 +126,37 @@ def test_prepared_document_is_reused_for_multiple_exports(
 
     assert calls == {"open": 1, "parse": 1, "composite": 1}
     assert prepared.closed
+
+
+def test_missing_slice_resource_still_allows_full_canvas_export(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "without-slices.psd"
+    source.write_bytes(b"fixture")
+    _patch_preparation(monkeypatch)
+    monkeypatch.setattr(
+        document_service_module,
+        "parse_document_slices",
+        lambda psd: (_ for _ in ()).throw(
+            SliceResourceMissingError("no slices")
+        ),
+    )
+
+    with prepare_document(source) as prepared:
+        assert prepared.summary.slice_count == 0
+        assert prepared.summary.issues[0].code == "no_slice_resource"
+        assert build_document_load_result(prepared).preview_png is not None
+        result = export_prepared_document(
+            prepared,
+            ExportOptions(
+                output_parent=tmp_path,
+                export_mode="full_canvas",
+            ),
+        )
+
+    assert result.success
+    assert result.output_path is not None
 
 
 def test_changed_source_rejects_cached_document(

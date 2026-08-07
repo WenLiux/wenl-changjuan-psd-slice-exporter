@@ -386,6 +386,63 @@ def test_prepared_target_width_export_reports_scale_and_strategy(
     composite.image.close()
 
 
+def test_full_canvas_export_writes_one_complete_image(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "long.psd"
+    slices, composite = prepared_document(source)
+
+    result = export_prepared_slices(
+        source,
+        slices,
+        composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            export_mode="full_canvas",
+        ),
+    )
+
+    assert result.success, result.failures
+    assert result.export_mode == "full_canvas"
+    assert result.exported_slices == ()
+    assert result.output_directory.name == "long_full_original"
+    assert result.output_path is not None
+    assert result.output_path.name == "long_full_10x20.png"
+    with Image.open(result.output_path) as output:
+        output.load()
+        assert output.size == (10, 20)
+        assert output.mode == "RGBA"
+        assert output.getpixel((0, 0)) == (10, 20, 30, 128)
+    assert result.validation_report.passed
+    composite.image.close()
+
+
+def test_full_canvas_export_ignores_slice_selection_and_scales_canvas(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "scaled.psd"
+    slices, composite = prepared_document(source)
+
+    result = export_prepared_slices(
+        source,
+        slices,
+        composite,
+        ExportOptions(
+            output_parent=tmp_path,
+            export_mode="full_canvas",
+            selected_slice_indices=frozenset({0}),
+            target_width=5,
+        ),
+    )
+
+    assert result.success, result.failures
+    assert result.target_width == 5
+    assert result.output_path is not None
+    with Image.open(result.output_path) as output:
+        assert output.size == (5, 10)
+    composite.image.close()
+
+
 @pytest.mark.parametrize(
     ("naming_rule", "expected_names"),
     [
